@@ -1,0 +1,7 @@
+{
+  "name": "SECOMO - Serre Connectée Modulaire",
+  "description": "POC professionnel pour le pilotage de serres urbaines connectées : dashboard temps réel, historique des capteurs, automatisation de l'arrosage et profils de plantes.",
+  "requestFramePermissions": [
+    "geolocation"
+  ]
+}
