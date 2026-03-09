@@ -27,8 +27,8 @@ async def websocket_endpoint(
     try:
         payload = jwt.decode(
             token,
-            settings.JWT_SECRET_KEY,
-            algorithms=[settings.JWT_ALGORITHM],
+            settings.SECRET_KEY,
+            algorithms=[settings.ALGORITHM],
         )
         user_id = payload.get("sub")
         if user_id is None:

@@ -1,15 +1,16 @@
 
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import {
-  User, Device, PlantProfile, SensorReading, Alert, Role,
+  User, Device, PlantProfile, SensorReading, Alert, Role, Station,
   WateringMode, WateringEvent, SensorStatus, Recommendation, AlertType, AlertCategory, ThemeType, UnitType, LanguageType
 } from './types';
-import { INITIAL_PLANTS, INITIAL_DEVICES, MOCK_USER } from './constants';
+import { INITIAL_PLANTS, INITIAL_DEVICES, INITIAL_STATIONS, MOCK_USER } from './constants';
 import SensorCard from './components/SensorCard';
 import HistoryChart from './components/HistoryChart';
 import WeatherWidget from './components/WeatherWidget';
 import Landing from './components/Landing';
 import Auth from './components/Auth';
+import QRScanner from './components/QRScanner';
 
 // --- API Services ---
 import * as authService from './services/auth.service';
@@ -36,7 +37,8 @@ function apiDeviceToDevice(d: deviceService.DeviceOut): Device {
     id: d.id, name: d.name, size: d.size as any, level: d.level as any,
     locationLabel: d.location_label, createdAt: d.created_at,
     isWatering: false, automationEnabled: d.automation_enabled,
-    config: { hasTempWater: true, hasPowerMeter: true, samplingFrequencySec: 10, phCalibrationOffset: 0 },
+    isLightOn: false, isFanOn: false,
+    config: { autoVentilation: false, autoLighting: false, samplingFrequencySec: 10, phCalibrationOffset: 0 },
   };
 }
 
@@ -53,11 +55,77 @@ function apiPlantToProfile(p: plantService.PlantOut): PlantProfile {
 function apiReadingToReading(r: sensorService.SensorReadingOut, deviceId: string): SensorReading {
   return {
     deviceId, timestamp: r.timestamp,
-    tempAir: r.temp_air ?? 0, tempWater: r.temp_water ?? 0,
-    humidity: r.humidity_soil ?? 0, light: r.light ?? 0,
-    soilPh: r.soil_ph ?? 0, watts: r.watts ?? 0,
+    tempAir: r.temp_air ?? 0,
+    humidity: r.humidity_soil ?? 0,
+    light: r.light ?? 0,
+    soilPh: r.soil_ph ?? 0,
+    batteryLevel: (r as any).battery_level ?? 85,
   };
 }
+
+// --- SwipeSlider : glisser pour ajuster une valeur ---
+const SwipeSlider: React.FC<{
+  value: number; min: number; max: number; step?: number;
+  onChange: (v: number) => void;
+  unit: string; label: string; color: string; isDark: boolean;
+}> = ({ value, min, max, step = 1, onChange, unit, label, color, isDark }) => {
+  const trackRef = useRef<HTMLDivElement>(null);
+  const draggingRef = useRef(false);
+  const startXRef = useRef(0);
+  const startValueRef = useRef(value);
+
+  const handleMove = useCallback((clientX: number) => {
+    if (!draggingRef.current || !trackRef.current) return;
+    const trackWidth = trackRef.current.clientWidth;
+    const delta = clientX - startXRef.current;
+    const range = max - min;
+    const raw = startValueRef.current + (delta / Math.max(trackWidth, 1)) * range;
+    const snapped = Math.round(raw / step) * step;
+    onChange(Math.min(max, Math.max(min, snapped)));
+  }, [min, max, step, onChange]);
+
+  useEffect(() => {
+    const onMouseMove = (e: MouseEvent) => handleMove(e.clientX);
+    const onTouchMove = (e: TouchEvent) => handleMove(e.touches[0].clientX);
+    const onUp = () => { draggingRef.current = false; };
+    document.addEventListener('mousemove', onMouseMove);
+    document.addEventListener('touchmove', onTouchMove, { passive: true });
+    document.addEventListener('mouseup', onUp);
+    document.addEventListener('touchend', onUp);
+    return () => {
+      document.removeEventListener('mousemove', onMouseMove);
+      document.removeEventListener('touchmove', onTouchMove);
+      document.removeEventListener('mouseup', onUp);
+      document.removeEventListener('touchend', onUp);
+    };
+  }, [handleMove]);
+
+  const pct = Math.max(0, Math.min(100, ((value - min) / (max - min)) * 100));
+
+  return (
+    <div className="space-y-2">
+      <div className="flex justify-between items-center">
+        <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">{label}</span>
+        <span className={`text-2xl font-black ${color}`}>{value}<span className="text-sm font-medium ml-1">{unit}</span></span>
+      </div>
+      <div
+        ref={trackRef}
+        className={`relative h-12 rounded-2xl cursor-ew-resize select-none overflow-hidden touch-none ${isDark ? 'bg-slate-800' : 'bg-slate-100'}`}
+        onMouseDown={e => { e.preventDefault(); draggingRef.current = true; startXRef.current = e.clientX; startValueRef.current = value; }}
+        onTouchStart={e => { draggingRef.current = true; startXRef.current = e.touches[0].clientX; startValueRef.current = value; }}
+      >
+        <div className={`h-full transition-none ${color.includes('blue') ? 'bg-blue-600' : color.includes('amber') ? 'bg-amber-500' : 'bg-emerald-600'}`} style={{ width: `${pct}%` }} />
+        <div className="absolute inset-0 flex items-center justify-center gap-2">
+          <i className="fas fa-arrows-left-right text-white/60 text-xs"></i>
+          <span className="text-xs font-bold text-white/70">Glisser pour ajuster</span>
+        </div>
+      </div>
+      <div className="flex justify-between text-[10px] text-slate-400 px-1">
+        <span>{min}{unit}</span><span>{max}{unit}</span>
+      </div>
+    </div>
+  );
+};
 
 const App: React.FC = () => {
   // --- Routing & Auth State ---
@@ -86,6 +154,21 @@ const App: React.FC = () => {
   const [catalogSearch, setCatalogSearch] = useState('');
   const [catalogResults, setCatalogResults] = useState<any[]>([]);
   const [catalogLoading, setCatalogLoading] = useState(false);
+  const [deletingPlantId, setDeletingPlantId] = useState<string | null>(null);
+
+  // --- Station / Bac Grid State ---
+  const [stations, setStations] = useState<Station[]>(INITIAL_STATIONS);
+  const [editingStation, setEditingStation] = useState<Station | null>(null);
+  const [expandedStationId, setExpandedStationId] = useState<string | null>(INITIAL_STATIONS[0]?.id ?? null);
+  const [swapSourceBacId, setSwapSourceBacId] = useState<string | null>(null);
+  const [editingBac, setEditingBac] = useState<{ stationId: string; row: number; col: number } | null>(null);
+  const [newBacName, setNewBacName] = useState('');
+  const [newBacPhysicalId, setNewBacPhysicalId] = useState('');
+  const [configuringBacId, setConfiguringBacId] = useState<string | null>(null);
+
+  // --- Mode Manuel State ---
+  const [manualDuration, setManualDuration] = useState(15);
+  const [manualTargetTemp, setManualTargetTemp] = useState(22);
 
   // --- Computed ---
   const selectedDevice = useMemo(() => 
@@ -205,11 +288,10 @@ const App: React.FC = () => {
         deviceId,
         timestamp: new Date().toISOString(),
         tempAir: data.temp_air ?? 0,
-        tempWater: data.temp_water ?? 0,
         humidity: data.humidity_soil ?? 0,
         light: data.light ?? 0,
         soilPh: data.soil_ph ?? 0,
-        watts: data.watts ?? 0,
+        batteryLevel: data.battery_level ?? 85,
       };
       setHistory(prev => {
         const deviceHistory = [...(prev[deviceId] || []), reading];
@@ -301,20 +383,35 @@ const App: React.FC = () => {
   };
 
   const recommendations = useMemo((): Recommendation[] => {
-    if (!currentReading || !currentPlant) return [];
+    if (!currentReading || !currentPlant || !selectedDevice) return [];
     const recs: Recommendation[] = [];
+    const isAuto = selectedDevice.automationEnabled;
 
-    if (currentReading.humidity < currentPlant.humidityMin) {
-      recs.push({ id: 'r1', text: 'Humidité critique : Arrosage nécessaire immédiatement.', severity: 'critical', action: 'Watering' });
-    }
-    if (currentReading.tempAir > currentPlant.tempMax) {
-      recs.push({ id: 'r2', text: 'Température trop élevée : Activer ventilation ou ombrage.', severity: 'warning' });
-    }
-    if (currentReading.light < currentPlant.lightMin) {
-      recs.push({ id: 'r3', text: 'Lumière insuffisante : Déplacer le bac ou activer les LEDs.', severity: 'info' });
+    if (!isAuto) {
+      // Mode Manuel : toutes les recommandations actionnables
+      if (currentReading.humidity < currentPlant.humidityMin) {
+        recs.push({ id: 'r1', text: `Humidité critique (${currentReading.humidity.toFixed(0)}%) : utilisez le bouton Arroser.`, severity: 'critical', action: 'water' });
+      }
+      if (currentReading.humidity > currentPlant.humidityMax) {
+        recs.push({ id: 'r2', text: `Sol trop humide (${currentReading.humidity.toFixed(0)}%) : suspendez l'arrosage.`, severity: 'warning' });
+      }
+      if (currentReading.tempAir > currentPlant.tempMax) {
+        recs.push({ id: 'r3', text: `Température trop élevée (${currentReading.tempAir.toFixed(1)}°C) : activez la ventilation.`, severity: 'warning', action: 'fan' });
+      }
+      if (currentReading.tempAir < currentPlant.tempMin) {
+        recs.push({ id: 'r4', text: `Température trop basse (${currentReading.tempAir.toFixed(1)}°C) : protégez la plante du froid.`, severity: 'warning' });
+      }
+      if (currentReading.light < currentPlant.lightMin) {
+        recs.push({ id: 'r5', text: `Lumière insuffisante (${currentReading.light.toFixed(0)}%) : activez l'éclairage LED.`, severity: 'info', action: 'light' });
+      }
+    } else {
+      // Mode Auto : seulement la luminosité (si insuffisante malgré l'éclairage auto → déplacer le bac)
+      if (currentReading.light < currentPlant.lightMin) {
+        recs.push({ id: 'r6', text: `Lumière insuffisante (${currentReading.light.toFixed(0)}%) même avec éclairage automatique. Envisagez de déplacer le bac vers une zone plus lumineuse.`, severity: 'info', action: 'move' });
+      }
     }
     return recs;
-  }, [currentReading, currentPlant]);
+  }, [currentReading, currentPlant, selectedDevice]);
 
   // --- Alert Engine (check TOUTES les plantes pour chaque reading) ---
   const checkAlerts = useCallback((reading: SensorReading, device: Device) => {
@@ -434,24 +531,22 @@ const App: React.FC = () => {
 
   // --- Simulation Engine (actif uniquement si backend offline) ---
   const generateReading = useCallback((deviceId: string, prev?: SensorReading): SensorReading => {
-    const base = prev || {
-      tempAir: 22, tempWater: 18, humidity: 55, light: 65, soilPh: 6.8, watts: 12
-    } as any;
+    const base = prev || { tempAir: 22, humidity: 55, light: 65, soilPh: 6.8, batteryLevel: 85 } as any;
     return {
       deviceId,
       timestamp: new Date().toISOString(),
       tempAir: Math.min(Math.max(base.tempAir + (Math.random() - 0.5) * 0.4, 5), 45),
-      tempWater: Math.min(Math.max(base.tempWater + (Math.random() - 0.5) * 0.2, 5), 35),
       humidity: Math.min(Math.max(base.humidity + (Math.random() - 0.5) * 1.5, 0), 100),
       light: Math.min(Math.max(base.light + (Math.random() - 0.5) * 4, 0), 100),
       soilPh: Math.min(Math.max(base.soilPh + (Math.random() - 0.5) * 0.05, 0), 14),
-      watts: 8 + Math.random() * 6
+      batteryLevel: Math.min(Math.max((base.batteryLevel ?? 85) - Math.random() * 0.05, 0), 100),
     };
   }, []);
 
   useEffect(() => {
-    // Ne lancer la simulation que si le backend est offline et qu'on a des devices
-    if (backendOnline || devices.length === 0) return;
+    // Lancer la simulation si pas de données réelles (backend offline ou ESP32 non connecté)
+    const hasRealData = devices.some(d => (history[d.id]?.length ?? 0) > 0);
+    if (devices.length === 0 || (backendOnline && hasRealData)) return;
 
     // Générer l'historique initial si vide
     if (Object.keys(history).length === 0) {
@@ -487,7 +582,7 @@ const App: React.FC = () => {
     }, 4000);
 
     return () => clearInterval(interval);
-  }, [backendOnline, devices, generateReading, checkAlerts]);
+  }, [backendOnline, devices, history, generateReading, checkAlerts]);
 
   // --- Actions ---
   const handleAuthSuccess = async (email: string, password?: string, firstName?: string, lastName?: string, isRegister?: boolean) => {
@@ -575,10 +670,8 @@ const App: React.FC = () => {
     setTimeout(() => setStatusMsg(null), 3000);
   };
 
-  const triggerWatering = async (deviceId: string, mode: WateringMode, reason: string) => {
+  const triggerWatering = async (deviceId: string, mode: WateringMode, reason: string, durationSec: number = 15) => {
     setDevices(prev => prev.map(d => d.id === deviceId ? { ...d, isWatering: true } : d));
-
-    const durationSec = 15;
 
     if (backendOnline) {
       try {
@@ -645,12 +738,96 @@ const App: React.FC = () => {
   };
 
   const handlePlantSave = (plant: PlantProfile) => {
-    if (plantProfiles.find(p => p.id === plant.id)) {
-      setPlantProfiles(prev => prev.map(p => p.id === plant.id ? plant : p));
-    } else {
+    const isNew = !plantProfiles.find(p => p.id === plant.id);
+    if (isNew) {
       setPlantProfiles(prev => [...prev, plant]);
+      setEditingPlant(null);
+      setView('config'); // Redirection vers config pour placer la plante dans un bac
+    } else {
+      setPlantProfiles(prev => prev.map(p => p.id === plant.id ? plant : p));
+      setEditingPlant(null);
     }
-    setEditingPlant(null);
+  };
+
+  const handleDeletePlant = async (plantId: string) => {
+    setPlantProfiles(prev => prev.filter(p => p.id !== plantId));
+    // Désassocier les bacs qui utilisaient cette plante
+    setDevices(prev => prev.map(d => d.currentPlantProfileId === plantId ? { ...d, currentPlantProfileId: undefined } : d));
+    if (backendOnline) {
+      try { await plantService.deletePlant(plantId); } catch { /* silently fail */ }
+    }
+    setDeletingPlantId(null);
+  };
+
+  const handleToggleLight = (deviceId: string) => {
+    setDevices(prev => prev.map(d => d.id === deviceId ? { ...d, isLightOn: !d.isLightOn } : d));
+  };
+
+  const handleToggleFan = (deviceId: string) => {
+    setDevices(prev => prev.map(d => d.id === deviceId ? { ...d, isFanOn: !d.isFanOn } : d));
+  };
+
+  // --- Station CRUD ---
+  const handleSaveStation = (station: Station) => {
+    const exists = stations.find(s => s.id === station.id);
+    if (exists) {
+      setStations(prev => prev.map(s => s.id === station.id ? station : s));
+    } else {
+      setStations(prev => [...prev, station]);
+      setExpandedStationId(station.id);
+    }
+    setEditingStation(null);
+  };
+
+  const handleDeleteStation = (stationId: string) => {
+    setStations(prev => prev.filter(s => s.id !== stationId));
+    setDevices(prev => prev.map(d => d.stationId === stationId ? { ...d, stationId: undefined, bacPosition: undefined } : d));
+    if (expandedStationId === stationId) setExpandedStationId(null);
+  };
+
+  // --- Bac Grid ---
+  const handleBacClick = (bacId: string) => {
+    if (swapSourceBacId === null) {
+      setSwapSourceBacId(bacId);
+    } else if (swapSourceBacId === bacId) {
+      setSwapSourceBacId(null);
+    } else {
+      // Interchanger les plantes entre les deux bacs
+      setDevices(prev => {
+        const bac1 = prev.find(d => d.id === swapSourceBacId);
+        const bac2 = prev.find(d => d.id === bacId);
+        if (!bac1 || !bac2) return prev;
+        return prev.map(d => {
+          if (d.id === swapSourceBacId) return { ...d, currentPlantProfileId: bac2.currentPlantProfileId };
+          if (d.id === bacId) return { ...d, currentPlantProfileId: bac1.currentPlantProfileId };
+          return d;
+        });
+      });
+      setSwapSourceBacId(null);
+    }
+  };
+
+  const handleCreateBac = (stationId: string, row: number, col: number) => {
+    if (!newBacName.trim()) return;
+    const newBac: Device = {
+      id: Math.random().toString(36).substr(2, 9),
+      name: newBacName.trim(),
+      size: 'Moyen', level: 'Base',
+      locationLabel: '',
+      stationId, bacPosition: { row, col },
+      isLightOn: false, isFanOn: false,
+      createdAt: new Date().toISOString(),
+      isWatering: false, automationEnabled: false,
+      config: { autoVentilation: false, autoLighting: false, samplingFrequencySec: 30, phCalibrationOffset: 0 },
+    };
+    setDevices(prev => [...prev, newBac]);
+    setEditingBac(null);
+    setNewBacName('');
+  };
+
+  const handleDeleteBac = (bacId: string) => {
+    setDevices(prev => prev.filter(d => d.id !== bacId));
+    if (selectedDeviceId === bacId) setSelectedDeviceId(devices.find(d => d.id !== bacId)?.id ?? null);
   };
 
   // --- Styles ---
@@ -725,12 +902,27 @@ const App: React.FC = () => {
           
           <div className="flex items-center gap-4">
             {view !== 'profil' && (
-              <select 
-                value={selectedDeviceId || ''} 
+              <select
+                value={selectedDeviceId || ''}
                 onChange={(e) => setSelectedDeviceId(e.target.value)}
                 className={`${inputClasses} border-none rounded-2xl px-6 py-3 text-sm font-bold focus:ring-2 focus:ring-emerald-500 outline-none cursor-pointer`}
               >
-                {devices.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
+                {stations.map(station => {
+                  const stationBacs = devices.filter(d => d.stationId === station.id);
+                  if (stationBacs.length === 0) return null;
+                  return (
+                    <optgroup key={station.id} label={`${station.name} (${station.locationLabel || 'Sans emplacement'})`}>
+                      {stationBacs.map(d => (
+                        <option key={d.id} value={d.id}>
+                          {d.name}{d.physicalId ? ' ⚡' : ''}
+                        </option>
+                      ))}
+                    </optgroup>
+                  );
+                })}
+                {devices.filter(d => !d.stationId).map(d => (
+                  <option key={d.id} value={d.id}>{d.name}</option>
+                ))}
               </select>
             )}
             {view === 'profil' && statusMsg && (
@@ -743,119 +935,166 @@ const App: React.FC = () => {
 
         <div className="p-8 max-w-7xl mx-auto space-y-8">
           
-          {view === 'dashboard' && selectedDevice && currentReading && currentPlant && (
+          {view === 'dashboard' && selectedDevice && (
             <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
               <div className="lg:col-span-3 space-y-8">
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                  <SensorCard label="Temp Air" value={formatTemp(currentReading.tempAir)} unit={currentUser.unit === 'celsius' ? '°C' : '°F'} status={getSensorStatus(currentReading.tempAir, currentPlant.tempMin, currentPlant.tempMax)} targetRange={`${formatTemp(currentPlant.tempMin).toFixed(0)}-${formatTemp(currentPlant.tempMax).toFixed(0)}°`} icon="fa-thermometer-half" isDark={isDarkMode} />
-                  <SensorCard label="Humidité" value={currentReading.humidity} unit="%" status={getSensorStatus(currentReading.humidity, currentPlant.humidityMin, currentPlant.humidityMax)} targetRange={`${currentPlant.humidityMin}-${currentPlant.humidityMax}%`} icon="fa-tint" isDark={isDarkMode} />
-                  <SensorCard label="Lumière" value={currentReading.light} unit="%" status={currentReading.light < currentPlant.lightMin ? 'low' : 'ok'} targetRange={`Min ${currentPlant.lightMin}%`} icon="fa-sun" isDark={isDarkMode} />
-                  <SensorCard label="pH Sol" value={currentReading.soilPh} unit="pH" status={getSensorStatus(currentReading.soilPh, currentPlant.phMin, currentPlant.phMax)} targetRange={`${currentPlant.phMin}-${currentPlant.phMax}`} icon="fa-flask" isDark={isDarkMode} />
-                  <SensorCard label="Puissance" value={currentReading.watts} unit="W" status="ok" icon="fa-bolt" hidden={!selectedDevice.config.hasPowerMeter} isDark={isDarkMode} />
-                  <SensorCard label="Temp Eau" value={formatTemp(currentReading.tempWater)} unit={currentUser.unit === 'celsius' ? '°C' : '°F'} status="ok" icon="fa-faucet-drip" hidden={!selectedDevice.config.hasTempWater} isDark={isDarkMode} />
-                </div>
+                {/* Cartes capteurs — placeholder si pas encore de données */}
+                {currentReading ? (
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    <SensorCard label="Temp Air" value={formatTemp(currentReading.tempAir)} unit={currentUser.unit === 'celsius' ? '°C' : '°F'} status={currentPlant ? getSensorStatus(currentReading.tempAir, currentPlant.tempMin, currentPlant.tempMax) : 'neutral'} targetRange={currentPlant ? `${formatTemp(currentPlant.tempMin).toFixed(0)}-${formatTemp(currentPlant.tempMax).toFixed(0)}°` : '—'} icon="fa-thermometer-half" isDark={isDarkMode} />
+                    <SensorCard label="Humidité" value={currentReading.humidity} unit="%" status={currentPlant ? getSensorStatus(currentReading.humidity, currentPlant.humidityMin, currentPlant.humidityMax) : 'neutral'} targetRange={currentPlant ? `${currentPlant.humidityMin}-${currentPlant.humidityMax}%` : '—'} icon="fa-tint" isDark={isDarkMode} />
+                    <SensorCard label="Lumière" value={currentReading.light} unit="%" status={currentPlant ? (currentReading.light < currentPlant.lightMin ? 'low' : 'ok') : 'neutral'} targetRange={currentPlant ? `Min ${currentPlant.lightMin}%` : '—'} icon="fa-sun" isDark={isDarkMode} />
+                    <SensorCard label="pH Sol" value={currentReading.soilPh} unit="pH" status={currentPlant ? getSensorStatus(currentReading.soilPh, currentPlant.phMin, currentPlant.phMax) : 'neutral'} targetRange={currentPlant ? `${currentPlant.phMin}-${currentPlant.phMax}` : '—'} icon="fa-flask" isDark={isDarkMode} />
+                    <SensorCard label="Batterie" value={Math.round(currentReading.batteryLevel)} unit="%" status={currentReading.batteryLevel < 20 ? 'low' : 'ok'} targetRange="Min 20%" icon="fa-battery-half" isDark={isDarkMode} />
+                  </div>
+                ) : (
+                  <div className={`${cardClasses} p-12 rounded-[32px] border text-center space-y-4`}>
+                    <i className="fas fa-satellite-dish text-4xl text-slate-300 block"></i>
+                    <p className={`font-black text-lg ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>En attente des capteurs</p>
+                    <p className="text-sm text-slate-400">Aucune donnée reçue pour ce bac. Connectez l'ESP32 ou attendez la prochaine mesure.</p>
+                  </div>
+                )}
                 <HistoryChart data={history[selectedDevice.id] || []} isDark={isDarkMode} />
               </div>
               <div className="space-y-8">
                 <WeatherWidget isDark={isDarkMode} />
                 <div className={`${cardClasses} p-8 rounded-[32px] border shadow-sm`}>
                   <h3 className={`text-lg font-black mb-6 ${isDarkMode ? 'text-slate-100' : 'text-slate-800'}`}>Plante Cultivée</h3>
-                  <div className="flex items-center gap-4 mb-6">
-                    <div className="w-16 h-16 bg-emerald-500/10 rounded-2xl flex items-center justify-center text-emerald-500 shadow-inner">
-                      <i className="fas fa-seedling text-3xl"></i>
+                  {currentPlant ? (
+                    <div className="flex items-center gap-4 mb-6">
+                      <div className="w-16 h-16 bg-emerald-500/10 rounded-2xl flex items-center justify-center text-emerald-500 shadow-inner">
+                        <i className="fas fa-seedling text-3xl"></i>
+                      </div>
+                      <div>
+                        <p className={`font-black text-xl ${isDarkMode ? 'text-slate-100' : 'text-slate-800'}`}>{currentPlant.name}</p>
+                        <p className="text-xs text-slate-400 italic">"{currentPlant.notes}"</p>
+                      </div>
                     </div>
-                    <div>
-                      <p className={`font-black text-xl ${isDarkMode ? 'text-slate-100' : 'text-slate-800'}`}>{currentPlant.name}</p>
-                      <p className="text-xs text-slate-400 italic">"{currentPlant.notes}"</p>
+                  ) : (
+                    <div className="flex items-center gap-4 mb-6">
+                      <div className="w-16 h-16 bg-slate-200/50 rounded-2xl flex items-center justify-center text-slate-400">
+                        <i className="fas fa-circle-question text-2xl"></i>
+                      </div>
+                      <p className="text-sm text-slate-400">Aucune plante assignée à ce bac.</p>
                     </div>
-                  </div>
+                  )}
                   <button onClick={() => setView('plantes')} className="w-full p-4 border-2 border-emerald-500/20 hover:border-emerald-500 hover:text-emerald-500 rounded-2xl text-xs font-black uppercase tracking-widest transition-all">
-                    Changer de Profil
+                    {currentPlant ? 'Changer de Profil' : 'Assigner une plante'}
                   </button>
                 </div>
 
-                {/* Panneau Arrosage + Contrôle */}
-                <div className={`${cardClasses} p-8 rounded-[32px] border shadow-sm space-y-6`}>
-                  <div className="flex items-center justify-between">
-                    <h3 className={`text-lg font-black ${isDarkMode ? 'text-slate-100' : 'text-slate-800'}`}>Arrosage</h3>
-                    {selectedDevice.isWatering && (
-                      <span className="flex items-center gap-2 text-xs font-bold text-blue-500 animate-pulse">
-                        <i className="fas fa-shower"></i> En cours...
+                {/* Mode AUTO toggle (compact) */}
+                <div className={`${cardClasses} p-5 rounded-[24px] border shadow-sm flex items-center justify-between`}>
+                  <div className="flex items-center gap-3">
+                    <i className={`fas fa-robot text-xl ${selectedDevice.automationEnabled ? 'text-emerald-500' : 'text-slate-400'}`}></i>
+                    <div>
+                      <p className={`text-sm font-bold ${isDarkMode ? 'text-slate-200' : 'text-slate-700'}`}>Mode {selectedDevice.automationEnabled ? 'AUTO' : 'MANUEL'}</p>
+                      <p className="text-[10px] text-slate-400">{selectedDevice.automationEnabled ? 'Régulation automatique active' : 'Contrôle manuel'}</p>
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => setDevices(prev => prev.map(d => d.id === selectedDevice.id ? { ...d, automationEnabled: !d.automationEnabled } : d))}
+                    className={`relative w-14 h-8 rounded-full transition-colors duration-300 ${selectedDevice.automationEnabled ? 'bg-emerald-500' : (isDarkMode ? 'bg-slate-700' : 'bg-slate-300')}`}
+                  >
+                    <div className={`absolute top-1 w-6 h-6 bg-white rounded-full shadow-md transition-transform duration-300 ${selectedDevice.automationEnabled ? 'translate-x-7' : 'translate-x-1'}`}></div>
+                  </button>
+                </div>
+
+                {/* Panneau Mode Manuel : masqué si AUTO actif */}
+                <div className={`${cardClasses} rounded-[32px] border shadow-sm overflow-hidden`}>
+                  <button
+                    onClick={() => { if (selectedDevice.automationEnabled) setDevices(prev => prev.map(d => d.id === selectedDevice.id ? { ...d, automationEnabled: false } : d)); }}
+                    className={`w-full p-6 flex items-center justify-between transition-colors ${selectedDevice.automationEnabled ? (isDarkMode ? 'bg-emerald-600/10' : 'bg-emerald-50') : ''}`}
+                  >
+                    <h3 className={`text-lg font-black flex items-center gap-2 ${isDarkMode ? 'text-slate-100' : 'text-slate-800'}`}>
+                      <i className={`fas fa-hand-pointer ${selectedDevice.automationEnabled ? 'text-slate-400' : 'text-slate-500'}`}></i>
+                      Contrôles Manuels
+                    </h3>
+                    {selectedDevice.automationEnabled && (
+                      <span className="text-xs font-bold text-emerald-500 flex items-center gap-2">
+                        <i className="fas fa-lock"></i> Mode AUTO actif — cliquer pour passer en manuel
                       </span>
+                    )}
+                  </button>
+
+                  {!selectedDevice.automationEnabled && (
+                  <div className="px-8 pb-8 space-y-7">
+
+                  {/* 1. Arroser la plante */}
+                  <div className="space-y-3">
+                    <p className={`text-xs font-black uppercase tracking-widest flex items-center gap-2 ${isDarkMode ? 'text-blue-400' : 'text-blue-600'}`}>
+                      <i className="fas fa-faucet-drip"></i> Arroser la plante
+                    </p>
+                    <SwipeSlider
+                      value={manualDuration} min={5} max={120} step={5}
+                      onChange={setManualDuration} unit="s" label="Durée"
+                      color="text-blue-500" isDark={isDarkMode}
+                    />
+                    <button
+                      onClick={() => !selectedDevice.isWatering && triggerWatering(selectedDevice.id, WateringMode.MANUAL, `Arrosage manuel ${manualDuration}s`, manualDuration)}
+                      disabled={selectedDevice.isWatering}
+                      className={`w-full py-4 rounded-2xl font-black uppercase tracking-widest transition-all active:scale-95 flex items-center justify-center gap-3 ${
+                        selectedDevice.isWatering
+                          ? (isDarkMode ? 'bg-slate-800 text-slate-600 cursor-not-allowed' : 'bg-slate-100 text-slate-400 cursor-not-allowed')
+                          : 'bg-blue-600 hover:bg-blue-700 text-white shadow-lg shadow-blue-600/20'
+                      }`}
+                    >
+                      <i className={`fas ${selectedDevice.isWatering ? 'fa-spinner fa-spin' : 'fa-faucet-drip'}`}></i>
+                      {selectedDevice.isWatering ? 'En cours...' : `Arroser ${manualDuration}s`}
+                    </button>
+                    {selectedDevice.lastWatering && (
+                      <p className={`text-[10px] ${isDarkMode ? 'text-slate-500' : 'text-slate-400'}`}>
+                        <i className="fas fa-clock mr-1"></i>Dernier : {new Date(selectedDevice.lastWatering).toLocaleString()}
+                      </p>
                     )}
                   </div>
 
-                  {/* Dernier arrosage */}
-                  {selectedDevice.lastWatering && (
-                    <div className={`text-xs ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>
-                      <i className="fas fa-clock mr-1"></i>
-                      Dernier : {new Date(selectedDevice.lastWatering).toLocaleString()}
-                    </div>
+                  <div className={`border-t ${isDarkMode ? 'border-slate-800' : 'border-slate-100'}`}></div>
+
+                  {/* 2. Ventilation / Température */}
+                  <div className="space-y-3">
+                    <p className={`text-xs font-black uppercase tracking-widest flex items-center gap-2 ${isDarkMode ? 'text-amber-400' : 'text-amber-600'}`}>
+                      <i className="fas fa-wind"></i> Ajuster la température
+                    </p>
+                    <SwipeSlider
+                      value={manualTargetTemp} min={10} max={40} step={1}
+                      onChange={setManualTargetTemp} unit="°C" label="Température cible"
+                      color="text-amber-500" isDark={isDarkMode}
+                    />
+                    <button
+                      onClick={() => handleToggleFan(selectedDevice.id)}
+                      className={`w-full py-4 rounded-2xl font-black uppercase tracking-widest transition-all active:scale-95 flex items-center justify-center gap-3 ${
+                        selectedDevice.isFanOn
+                          ? 'bg-amber-500 hover:bg-amber-600 text-white shadow-lg shadow-amber-500/20'
+                          : (isDarkMode ? 'bg-slate-800 hover:bg-amber-500/20 text-slate-300 hover:text-amber-400' : 'bg-slate-100 hover:bg-amber-50 text-slate-600 hover:text-amber-600')
+                      }`}
+                    >
+                      <i className={`fas fa-wind ${selectedDevice.isFanOn ? 'animate-spin' : ''}`} style={selectedDevice.isFanOn ? { animationDuration: '1.5s' } : {}}></i>
+                      {selectedDevice.isFanOn ? `Ventilateur ON → ${manualTargetTemp}°C` : 'Ventilateur OFF'}
+                    </button>
+                  </div>
+
+                  <div className={`border-t ${isDarkMode ? 'border-slate-800' : 'border-slate-100'}`}></div>
+
+                  {/* 3. Lumière */}
+                  <div className="space-y-3">
+                    <p className={`text-xs font-black uppercase tracking-widest flex items-center gap-2 ${isDarkMode ? 'text-yellow-400' : 'text-yellow-600'}`}>
+                      <i className="fas fa-lightbulb"></i> Éclairage LED
+                    </p>
+                    <button
+                      onClick={() => handleToggleLight(selectedDevice.id)}
+                      className={`w-full py-5 rounded-2xl font-black uppercase tracking-widest transition-all active:scale-95 flex items-center justify-center gap-3 text-lg ${
+                        selectedDevice.isLightOn
+                          ? 'bg-yellow-400 hover:bg-yellow-500 text-yellow-950 shadow-lg shadow-yellow-400/30'
+                          : (isDarkMode ? 'bg-slate-800 hover:bg-yellow-400/10 text-slate-400 hover:text-yellow-400' : 'bg-slate-100 hover:bg-yellow-50 text-slate-500 hover:text-yellow-600')
+                      }`}
+                    >
+                      <i className={`fas fa-lightbulb ${selectedDevice.isLightOn ? 'text-yellow-700' : ''}`}></i>
+                      {selectedDevice.isLightOn ? 'Lumière allumée' : 'Lumière éteinte'}
+                    </button>
+                  </div>
+                  </div>
                   )}
-
-                  {/* Mode AUTO toggle */}
-                  <div className={`flex items-center justify-between p-4 rounded-2xl ${isDarkMode ? 'bg-slate-800' : 'bg-slate-50'}`}>
-                    <div className="flex items-center gap-3">
-                      <i className={`fas fa-robot ${selectedDevice.automationEnabled ? 'text-emerald-500' : 'text-slate-400'}`}></i>
-                      <div>
-                        <p className={`text-sm font-bold ${isDarkMode ? 'text-slate-200' : 'text-slate-700'}`}>Mode AUTO</p>
-                        <p className="text-[10px] text-slate-400">Arrosage automatique</p>
-                      </div>
-                    </div>
-                    <button
-                      onClick={() => setDevices(prev => prev.map(d => d.id === selectedDevice.id ? { ...d, automationEnabled: !d.automationEnabled } : d))}
-                      className={`relative w-14 h-8 rounded-full transition-colors duration-300 ${selectedDevice.automationEnabled ? 'bg-emerald-500' : (isDarkMode ? 'bg-slate-700' : 'bg-slate-300')}`}
-                    >
-                      <div className={`absolute top-1 w-6 h-6 bg-white rounded-full shadow-md transition-transform duration-300 ${selectedDevice.automationEnabled ? 'translate-x-7' : 'translate-x-1'}`}></div>
-                    </button>
-                  </div>
-
-                  {/* Bouton arrosage manuel */}
-                  <button
-                    onClick={() => {
-                      if (!selectedDevice.isWatering) {
-                        triggerWatering(selectedDevice.id, WateringMode.MANUAL, 'Arrosage manuel depuis le dashboard');
-                      }
-                    }}
-                    disabled={selectedDevice.isWatering}
-                    className={`w-full py-4 rounded-2xl font-black uppercase tracking-widest transition-all active:scale-95 flex items-center justify-center gap-3 ${
-                      selectedDevice.isWatering
-                        ? (isDarkMode ? 'bg-slate-800 text-slate-600 cursor-not-allowed' : 'bg-slate-100 text-slate-400 cursor-not-allowed')
-                        : 'bg-blue-600 hover:bg-blue-700 text-white shadow-lg shadow-blue-600/20'
-                    }`}
-                  >
-                    <i className={`fas ${selectedDevice.isWatering ? 'fa-spinner fa-spin' : 'fa-faucet-drip'}`}></i>
-                    {selectedDevice.isWatering ? 'Arrosage en cours...' : 'Arroser maintenant'}
-                  </button>
-
-                  {/* Commandes rapides */}
-                  <div className="grid grid-cols-2 gap-2">
-                    <button
-                      onClick={() => triggerWatering(selectedDevice.id, WateringMode.MANUAL, 'Arrosage court (10s)')}
-                      disabled={selectedDevice.isWatering}
-                      className={`p-3 rounded-xl text-[10px] font-bold uppercase tracking-wider transition-all ${isDarkMode ? 'bg-slate-800 text-slate-300 hover:bg-blue-600/20 hover:text-blue-400 disabled:opacity-40' : 'bg-slate-50 text-slate-600 hover:bg-blue-50 hover:text-blue-600 disabled:opacity-40'}`}
-                    >
-                      <i className="fas fa-tint mr-1"></i>10s
-                    </button>
-                    <button
-                      onClick={() => {
-                        setDevices(prev => prev.map(d => d.id === selectedDevice.id ? { ...d, isWatering: true } : d));
-                        const event: WateringEvent = {
-                          id: Math.random().toString(36).substr(2, 9),
-                          deviceId: selectedDevice.id, timestamp: new Date().toISOString(),
-                          mode: WateringMode.MANUAL, durationSec: 30, reason: 'Arrosage long (30s)'
-                        };
-                        setWateringEvents(prev => [event, ...prev]);
-                        setTimeout(() => {
-                          setDevices(prev => prev.map(d => d.id === selectedDevice.id ? { ...d, isWatering: false, lastWatering: new Date().toISOString() } : d));
-                        }, 30000);
-                      }}
-                      disabled={selectedDevice.isWatering}
-                      className={`p-3 rounded-xl text-[10px] font-bold uppercase tracking-wider transition-all ${isDarkMode ? 'bg-slate-800 text-slate-300 hover:bg-blue-600/20 hover:text-blue-400 disabled:opacity-40' : 'bg-slate-50 text-slate-600 hover:bg-blue-50 hover:text-blue-600 disabled:opacity-40'}`}
-                    >
-                      <i className="fas fa-tint mr-1"></i>30s
-                    </button>
-                  </div>
                 </div>
 
                 {/* Recommandations */}
@@ -1087,6 +1326,7 @@ const App: React.FC = () => {
                       </div>
                       <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
                         <button onClick={() => setEditingPlant(plant)} className={`p-3 rounded-xl transition-colors ${isDarkMode ? 'bg-slate-800 text-slate-400 hover:text-emerald-500' : 'bg-slate-50 text-slate-400 hover:text-emerald-600'}`}><i className="fas fa-edit"></i></button>
+                        <button onClick={() => setDeletingPlantId(plant.id)} className={`p-3 rounded-xl transition-colors ${isDarkMode ? 'bg-slate-800 text-slate-400 hover:text-rose-500' : 'bg-slate-50 text-slate-400 hover:text-rose-500'}`}><i className="fas fa-trash"></i></button>
                       </div>
                     </div>
                     <h3 className={`text-2xl font-black mb-2 ${isDarkMode ? 'text-slate-100' : 'text-slate-800'}`}>{plant.name}</h3>
@@ -1108,151 +1348,154 @@ const App: React.FC = () => {
             </div>
           )}
 
-          {view === 'config' && selectedDevice && (
+          {view === 'config' && (() => {
+            const GRID_ROWS = 3;
+            const GRID_COLS = 4;
+            const plantsWithoutBac = plantProfiles.filter(p => !devices.some(d => d.currentPlantProfileId === p.id));
+
+            return (
             <div className="space-y-8">
-              <p className="text-slate-400 font-medium">Configurez les paramètres de la station <span className="text-emerald-500 font-bold">{selectedDevice.name}</span>.</p>
+              {/* En-tête */}
+              <div className="flex justify-between items-center">
+                <p className="text-slate-400 font-medium">Gérez vos stations et positionnez vos bacs sur la grille.</p>
+                <button
+                  onClick={() => setEditingStation({ id: Math.random().toString(36).substr(2, 9), name: '', locationLabel: '', createdAt: new Date().toISOString() })}
+                  className="bg-emerald-600 text-white px-6 py-3 rounded-2xl font-bold flex items-center gap-3 shadow-lg shadow-emerald-100"
+                >
+                  <i className="fas fa-plus"></i> Nouvelle station
+                </button>
+              </div>
 
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-                {/* Infos du device */}
-                <section className={`${cardClasses} p-10 rounded-[40px] border shadow-sm space-y-8`}>
-                  <div className="flex items-center gap-4">
-                    <div className="w-14 h-14 bg-emerald-600 rounded-2xl flex items-center justify-center text-white text-2xl shadow-lg shadow-emerald-600/20">
-                      <i className="fas fa-microchip"></i>
-                    </div>
-                    <div>
-                      <h3 className={`text-xl font-black ${isDarkMode ? 'text-slate-100' : 'text-slate-800'}`}>Station</h3>
-                      <p className="text-slate-400 text-sm font-medium">Identité et paramètres matériels</p>
-                    </div>
+              {/* Alerte plantes sans bac */}
+              {plantsWithoutBac.length > 0 && (
+                <div className={`p-5 rounded-2xl border-2 border-rose-400/40 ${isDarkMode ? 'bg-rose-500/10' : 'bg-rose-50'} flex items-start gap-3`}>
+                  <i className="fas fa-circle-exclamation text-rose-500 mt-0.5"></i>
+                  <div>
+                    <p className={`text-sm font-bold ${isDarkMode ? 'text-rose-300' : 'text-rose-700'}`}>Plantes sans bac assigné</p>
+                    <p className="text-xs text-rose-400 mt-1">
+                      {plantsWithoutBac.map(p => p.name).join(', ')} — Placez-les dans un bac via la grille ci-dessous.
+                    </p>
                   </div>
+                </div>
+              )}
 
-                  <div className="space-y-5">
-                    <div className="space-y-2">
-                      <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest ml-1">Nom de la station</label>
-                      <input
-                        type="text"
-                        value={selectedDevice.name}
-                        onChange={e => setDevices(prev => prev.map(d => d.id === selectedDevice.id ? { ...d, name: e.target.value } : d))}
-                        className={`w-full ${inputClasses} rounded-2xl p-4 font-bold outline-none focus:ring-2 focus:ring-emerald-500 transition-all`}
-                      />
-                    </div>
+              {/* Liste des stations */}
+              {stations.length === 0 && (
+                <div className={`${cardClasses} p-16 rounded-[32px] border text-center`}>
+                  <i className="fas fa-layer-group text-5xl text-slate-300 mb-6 block"></i>
+                  <p className={`text-xl font-black ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>Aucune station</p>
+                  <p className="text-sm text-slate-400 mt-2">Créez une station pour organiser vos bacs.</p>
+                </div>
+              )}
 
-                    <div className="space-y-2">
-                      <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest ml-1">Emplacement</label>
-                      <input
-                        type="text"
-                        value={selectedDevice.locationLabel}
-                        onChange={e => setDevices(prev => prev.map(d => d.id === selectedDevice.id ? { ...d, locationLabel: e.target.value } : d))}
-                        placeholder="Ex: Balcon, Jardin, Bureau..."
-                        className={`w-full ${inputClasses} rounded-2xl p-4 font-bold outline-none focus:ring-2 focus:ring-emerald-500 transition-all`}
-                      />
-                    </div>
+              {stations.map(station => {
+                const stationBacs = devices.filter(d => d.stationId === station.id);
+                const isExpanded = expandedStationId === station.id;
 
-                    <div className="grid grid-cols-2 gap-4">
-                      <div className="space-y-2">
-                        <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest ml-1">Taille du bac</label>
-                        <select
-                          value={selectedDevice.size}
-                          onChange={e => setDevices(prev => prev.map(d => d.id === selectedDevice.id ? { ...d, size: e.target.value as any } : d))}
-                          className={`w-full ${inputClasses} rounded-2xl p-4 font-bold outline-none cursor-pointer`}
-                        >
-                          <option value="Petit">Petit (~5L)</option>
-                          <option value="Moyen">Moyen (~15L)</option>
-                          <option value="Grand">Grand (~40L)</option>
-                        </select>
-                      </div>
-                      <div className="space-y-2">
-                        <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest ml-1">Niveau équipement</label>
-                        <select
-                          value={selectedDevice.level}
-                          onChange={e => setDevices(prev => prev.map(d => d.id === selectedDevice.id ? { ...d, level: e.target.value as any } : d))}
-                          className={`w-full ${inputClasses} rounded-2xl p-4 font-bold outline-none cursor-pointer`}
-                        >
-                          <option value="Base">Base</option>
-                          <option value="Intermédiaire">Intermédiaire</option>
-                          <option value="Final">Final</option>
-                        </select>
-                      </div>
-                    </div>
-                  </div>
-                </section>
-
-                {/* Automatisation */}
-                <section className={`${cardClasses} p-10 rounded-[40px] border shadow-sm space-y-8`}>
-                  <div className="flex items-center gap-4">
-                    <div className="w-14 h-14 bg-blue-600 rounded-2xl flex items-center justify-center text-white text-2xl shadow-lg shadow-blue-600/20">
-                      <i className="fas fa-robot"></i>
-                    </div>
-                    <div>
-                      <h3 className={`text-xl font-black ${isDarkMode ? 'text-slate-100' : 'text-slate-800'}`}>Automatisation</h3>
-                      <p className="text-slate-400 text-sm font-medium">Arrosage et contrôle automatique</p>
-                    </div>
-                  </div>
-
-                  {/* Toggle AUTO */}
-                  <div className={`flex items-center justify-between p-5 rounded-2xl ${isDarkMode ? 'bg-slate-800' : 'bg-slate-50'}`}>
-                    <div>
-                      <p className={`font-bold ${isDarkMode ? 'text-slate-200' : 'text-slate-700'}`}>Arrosage automatique</p>
-                      <p className="text-xs text-slate-400 mt-1">
-                        {selectedDevice.automationEnabled
-                          ? 'La station arrose automatiquement quand le sol est trop sec.'
-                          : 'Désactivé — arrosage manuel uniquement.'}
-                      </p>
-                    </div>
-                    <button
-                      onClick={() => setDevices(prev => prev.map(d => d.id === selectedDevice.id ? { ...d, automationEnabled: !d.automationEnabled } : d))}
-                      className={`relative w-16 h-9 rounded-full transition-colors duration-300 flex-shrink-0 ${selectedDevice.automationEnabled ? 'bg-emerald-500' : (isDarkMode ? 'bg-slate-700' : 'bg-slate-300')}`}
+                return (
+                  <div key={station.id} className={`${cardClasses} rounded-[32px] border shadow-sm overflow-hidden`}>
+                    {/* En-tête station */}
+                    <div
+                      className={`p-8 flex items-center justify-between cursor-pointer transition-colors ${isDarkMode ? 'hover:bg-slate-800/50' : 'hover:bg-slate-50'}`}
+                      onClick={() => setExpandedStationId(isExpanded ? null : station.id)}
                     >
-                      <div className={`absolute top-1.5 w-6 h-6 bg-white rounded-full shadow-md transition-transform duration-300 ${selectedDevice.automationEnabled ? 'translate-x-8' : 'translate-x-1.5'}`}></div>
-                    </button>
-                  </div>
-
-                  {/* Capteurs optionnels */}
-                  <div className="space-y-3">
-                    <p className="text-[10px] font-black uppercase text-slate-400 tracking-widest ml-1">Capteurs activés</p>
-                    {[
-                      { key: 'hasTempWater', label: 'Sonde température eau', icon: 'fa-faucet-drip' },
-                      { key: 'hasPowerMeter', label: 'Mesure de puissance (W)', icon: 'fa-bolt' },
-                    ].map(sensor => (
-                      <div key={sensor.key} className={`flex items-center justify-between p-4 rounded-2xl ${isDarkMode ? 'bg-slate-800' : 'bg-slate-50'}`}>
-                        <div className="flex items-center gap-3">
-                          <i className={`fas ${sensor.icon} w-5 text-center ${(selectedDevice.config as any)[sensor.key] ? 'text-emerald-500' : 'text-slate-400'}`}></i>
-                          <span className={`text-sm font-bold ${isDarkMode ? 'text-slate-200' : 'text-slate-700'}`}>{sensor.label}</span>
+                      <div className="flex items-center gap-4">
+                        <div className="w-12 h-12 bg-emerald-600 rounded-2xl flex items-center justify-center text-white shadow-lg shadow-emerald-600/20">
+                          <i className="fas fa-layer-group"></i>
                         </div>
-                        <button
-                          onClick={() => setDevices(prev => prev.map(d => d.id === selectedDevice.id ? { ...d, config: { ...d.config, [sensor.key]: !(d.config as any)[sensor.key] } } : d))}
-                          className={`relative w-12 h-7 rounded-full transition-colors duration-300 ${(selectedDevice.config as any)[sensor.key] ? 'bg-emerald-500' : (isDarkMode ? 'bg-slate-700' : 'bg-slate-300')}`}
-                        >
-                          <div className={`absolute top-1 w-5 h-5 bg-white rounded-full shadow-sm transition-transform duration-300 ${(selectedDevice.config as any)[sensor.key] ? 'translate-x-6' : 'translate-x-1'}`}></div>
-                        </button>
+                        <div>
+                          <h3 className={`text-xl font-black ${isDarkMode ? 'text-slate-100' : 'text-slate-800'}`}>{station.name || 'Station sans nom'}</h3>
+                          <p className="text-sm text-slate-400"><i className="fas fa-location-dot mr-1"></i>{station.locationLabel || 'Emplacement non défini'} · {stationBacs.length} bac{stationBacs.length !== 1 ? 's' : ''}</p>
+                        </div>
                       </div>
-                    ))}
-                  </div>
+                      <div className="flex items-center gap-3">
+                        <button onClick={e => { e.stopPropagation(); setEditingStation(station); }} className={`p-3 rounded-xl transition-colors ${isDarkMode ? 'hover:bg-slate-700 text-slate-400 hover:text-emerald-400' : 'hover:bg-slate-100 text-slate-400 hover:text-emerald-600'}`}>
+                          <i className="fas fa-edit"></i>
+                        </button>
+                        <button onClick={e => { e.stopPropagation(); handleDeleteStation(station.id); }} className={`p-3 rounded-xl transition-colors ${isDarkMode ? 'hover:bg-rose-500/20 text-slate-400 hover:text-rose-400' : 'hover:bg-rose-50 text-slate-400 hover:text-rose-500'}`}>
+                          <i className="fas fa-trash"></i>
+                        </button>
+                        <i className={`fas fa-chevron-${isExpanded ? 'up' : 'down'} text-slate-400 ml-2`}></i>
+                      </div>
+                    </div>
 
-                  {/* Fréquence d'échantillonnage */}
-                  <div className="space-y-2">
-                    <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest ml-1">Fréquence de mesure</label>
-                    <select
-                      value={selectedDevice.config.samplingFrequencySec}
-                      onChange={e => setDevices(prev => prev.map(d => d.id === selectedDevice.id ? { ...d, config: { ...d.config, samplingFrequencySec: +e.target.value } } : d))}
-                      className={`w-full ${inputClasses} rounded-2xl p-4 font-bold outline-none cursor-pointer`}
-                    >
-                      <option value={5}>Toutes les 5 secondes</option>
-                      <option value={10}>Toutes les 10 secondes</option>
-                      <option value={30}>Toutes les 30 secondes</option>
-                      <option value={60}>Toutes les minutes</option>
-                    </select>
-                  </div>
-                </section>
-              </div>
+                    {/* Grille bacs */}
+                    {isExpanded && (
+                      <div className={`px-8 pb-8 border-t ${isDarkMode ? 'border-slate-800' : 'border-slate-100'}`}>
+                        <div className="pt-6 space-y-4">
+                          {swapSourceBacId && (
+                            <p className="text-xs font-bold text-amber-500 flex items-center gap-2">
+                              <i className="fas fa-arrows-rotate"></i>
+                              Bac sélectionné : <span className="text-amber-400">{devices.find(d => d.id === swapSourceBacId)?.name}</span> — Cliquez sur un autre bac pour interchanger leurs plantes
+                              <button onClick={() => setSwapSourceBacId(null)} className="ml-2 text-slate-400 hover:text-slate-200"><i className="fas fa-times"></i></button>
+                            </p>
+                          )}
+                          <div className="grid gap-3" style={{ gridTemplateColumns: `repeat(${GRID_COLS}, minmax(0, 1fr))` }}>
+                            {Array.from({ length: GRID_ROWS }, (_, row) =>
+                              Array.from({ length: GRID_COLS }, (_, col) => {
+                                const bac = stationBacs.find(d => d.bacPosition?.row === row && d.bacPosition?.col === col);
+                                const plant = bac ? plantProfiles.find(p => p.id === bac.currentPlantProfileId) : null;
+                                const isSelected = bac?.id === swapSourceBacId;
+                                const hasNoPlant = bac && !plant;
 
-              {/* Infos device */}
-              <div className={`${cardClasses} p-6 rounded-[32px] border text-center opacity-60`}>
-                <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1">Informations station</p>
-                <p className="text-xs font-bold text-slate-500">Créée le {new Date(selectedDevice.createdAt).toLocaleDateString()}</p>
-                <p className="text-[10px] text-slate-400 mt-1">ID : {selectedDevice.id}</p>
-              </div>
+                                if (bac) {
+                                  return (
+                                    <div
+                                      key={`${row}-${col}`}
+                                      onClick={() => handleBacClick(bac.id)}
+                                      className={`relative min-h-[90px] p-3 rounded-2xl border-2 cursor-pointer transition-all group ${
+                                        isSelected
+                                          ? 'border-amber-400 bg-amber-400/10 scale-105'
+                                          : hasNoPlant
+                                          ? 'border-rose-400/60 bg-rose-500/10 animate-pulse'
+                                          : (isDarkMode ? 'border-slate-700 bg-slate-800 hover:border-emerald-500/50' : 'border-slate-200 bg-slate-50 hover:border-emerald-400')
+                                      }`}
+                                    >
+                                      <p className={`text-[10px] font-black uppercase tracking-wider truncate ${isDarkMode ? 'text-slate-300' : 'text-slate-700'}`}>{bac.name}</p>
+                                      {plant ? (
+                                        <p className="text-[10px] text-emerald-500 font-bold mt-1 truncate flex items-center gap-1"><i className="fas fa-seedling"></i>{plant.name}</p>
+                                      ) : (
+                                        <p className="text-[10px] text-rose-400 font-bold mt-1 flex items-center gap-1"><i className="fas fa-exclamation-circle"></i>Aucune plante</p>
+                                      )}
+                                      {/* Assign plant dropdown */}
+                                      <select
+                                        value={bac.currentPlantProfileId || ''}
+                                        onChange={e => { e.stopPropagation(); setDevices(prev => prev.map(d => d.id === bac.id ? { ...d, currentPlantProfileId: e.target.value || undefined } : d)); }}
+                                        onClick={e => e.stopPropagation()}
+                                        className={`mt-2 w-full text-[9px] rounded-lg p-1 font-bold outline-none cursor-pointer border-0 ${isDarkMode ? 'bg-slate-700 text-slate-300' : 'bg-white text-slate-600'}`}
+                                      >
+                                        <option value="">— Aucune plante —</option>
+                                        {plantProfiles.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+                                      </select>
+                                      <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                        <button onClick={e => { e.stopPropagation(); setConfiguringBacId(bac.id); }} className="w-5 h-5 rounded-full bg-blue-500/20 text-blue-400 flex items-center justify-center text-[9px]"><i className="fas fa-gear"></i></button>
+                                        <button onClick={e => { e.stopPropagation(); handleDeleteBac(bac.id); }} className="w-5 h-5 rounded-full bg-rose-500/20 text-rose-400 flex items-center justify-center text-[9px]"><i className="fas fa-times"></i></button>
+                                      </div>
+                                    </div>
+                                  );
+                                }
+                                return (
+                                  <div
+                                    key={`${row}-${col}`}
+                                    onClick={() => { setEditingBac({ stationId: station.id, row, col }); setNewBacName(''); }}
+                                    className={`min-h-[90px] p-3 rounded-2xl border-2 border-dashed cursor-pointer flex items-center justify-center transition-all ${isDarkMode ? 'border-slate-700 hover:border-emerald-500/50 hover:bg-emerald-500/5' : 'border-slate-200 hover:border-emerald-400 hover:bg-emerald-50'}`}
+                                  >
+                                    <i className="fas fa-plus text-slate-300 text-lg"></i>
+                                  </div>
+                                );
+                              })
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+
             </div>
-          )}
+            );
+          })()}
 
           {view === 'activities' && (
             <div className="space-y-8">
@@ -1449,6 +1692,187 @@ const App: React.FC = () => {
           })()}
         </div>
       </main>
+
+      {/* Modal confirmation suppression plante */}
+      {deletingPlantId && (() => {
+        const plant = plantProfiles.find(p => p.id === deletingPlantId);
+        return (
+          <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 backdrop-blur-sm" onClick={() => setDeletingPlantId(null)}>
+            <div className={`w-full max-w-sm mx-4 ${cardClasses} rounded-[32px] border shadow-2xl p-10 space-y-6`} onClick={e => e.stopPropagation()}>
+              <div className="text-center space-y-3">
+                <div className="w-16 h-16 bg-rose-500/10 rounded-full flex items-center justify-center mx-auto"><i className="fas fa-trash text-rose-500 text-2xl"></i></div>
+                <h3 className={`text-xl font-black ${isDarkMode ? 'text-slate-100' : 'text-slate-800'}`}>Supprimer la plante ?</h3>
+                <p className="text-sm text-slate-400">"{plant?.name}" sera supprimée et désassociée de tous les bacs.</p>
+              </div>
+              <div className="flex gap-4">
+                <button onClick={() => setDeletingPlantId(null)} className={`flex-1 py-4 rounded-2xl font-black uppercase tracking-widest ${isDarkMode ? 'bg-slate-800 text-slate-300 hover:bg-slate-700' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}>Annuler</button>
+                <button onClick={() => handleDeletePlant(deletingPlantId)} className="flex-1 bg-rose-500 hover:bg-rose-600 text-white py-4 rounded-2xl font-black uppercase tracking-widest shadow-lg shadow-rose-500/20">Supprimer</button>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
+
+      {/* Modal édition / création station */}
+      {editingStation && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 backdrop-blur-sm" onClick={() => setEditingStation(null)}>
+          <div className={`w-full max-w-md mx-4 ${cardClasses} rounded-[32px] border shadow-2xl p-10 space-y-6`} onClick={e => e.stopPropagation()}>
+            <h3 className={`text-2xl font-black ${isDarkMode ? 'text-slate-100' : 'text-slate-800'}`}>
+              {stations.find(s => s.id === editingStation.id) ? 'Modifier la station' : 'Nouvelle station'}
+            </h3>
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest ml-1">Nom de la station</label>
+                <input type="text" value={editingStation.name} onChange={e => setEditingStation({ ...editingStation, name: e.target.value })} placeholder="Ex: Station Jardin" className={`w-full ${inputClasses} rounded-2xl p-4 font-bold outline-none focus:ring-2 focus:ring-emerald-500`} autoFocus />
+              </div>
+              <div className="space-y-2">
+                <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest ml-1">Emplacement</label>
+                <input type="text" value={editingStation.locationLabel} onChange={e => setEditingStation({ ...editingStation, locationLabel: e.target.value })} placeholder="Ex: Jardin, Balcon, Serre..." className={`w-full ${inputClasses} rounded-2xl p-4 font-bold outline-none focus:ring-2 focus:ring-emerald-500`} />
+              </div>
+            </div>
+            <div className="flex gap-4 pt-2">
+              <button onClick={() => setEditingStation(null)} className={`flex-1 py-4 rounded-2xl font-black uppercase tracking-widest ${isDarkMode ? 'bg-slate-800 text-slate-300 hover:bg-slate-700' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}>Annuler</button>
+              <button onClick={() => { if (editingStation.name.trim()) handleSaveStation(editingStation); }} className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white py-4 rounded-2xl font-black uppercase tracking-widest shadow-lg shadow-emerald-600/20">Enregistrer</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal configuration d'un bac (engrenage) */}
+      {configuringBacId && (() => {
+        const bac = devices.find(d => d.id === configuringBacId);
+        if (!bac) return null;
+        const update = (patch: Partial<Device>) => setDevices(prev => prev.map(d => d.id === bac.id ? { ...d, ...patch } : d));
+        const updateCfg = (patch: Partial<typeof bac.config>) => setDevices(prev => prev.map(d => d.id === bac.id ? { ...d, config: { ...d.config, ...patch } } : d));
+        return (
+          <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 backdrop-blur-sm" onClick={() => setConfiguringBacId(null)}>
+            <div className={`w-full max-w-md mx-4 max-h-[90vh] overflow-y-auto ${cardClasses} rounded-[32px] border shadow-2xl p-10 space-y-6`} onClick={e => e.stopPropagation()}>
+              <div className="flex items-center justify-between">
+                <h3 className={`text-xl font-black ${isDarkMode ? 'text-slate-100' : 'text-slate-800'}`}>
+                  <i className="fas fa-gear mr-2 text-blue-500"></i>{bac.name}
+                </h3>
+                <button onClick={() => setConfiguringBacId(null)} className="text-slate-400 hover:text-slate-200"><i className="fas fa-times"></i></button>
+              </div>
+
+              {/* Infos bac */}
+              <div className="space-y-3">
+                <div className="space-y-1">
+                  <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest ml-1">Nom</label>
+                  <input type="text" value={bac.name} onChange={e => update({ name: e.target.value })} className={`w-full ${inputClasses} rounded-2xl p-3 font-bold outline-none focus:ring-2 focus:ring-emerald-500`} />
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest ml-1">Taille</label>
+                    <select value={bac.size} onChange={e => update({ size: e.target.value as any })} className={`w-full ${inputClasses} rounded-2xl p-3 font-bold outline-none cursor-pointer`}>
+                      <option value="Petit">Petit (~5L)</option><option value="Moyen">Moyen (~15L)</option><option value="Grand">Grand (~40L)</option>
+                    </select>
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest ml-1">Mesures</label>
+                    <select value={bac.config.samplingFrequencySec} onChange={e => updateCfg({ samplingFrequencySec: +e.target.value })} className={`w-full ${inputClasses} rounded-2xl p-3 font-bold outline-none cursor-pointer`}>
+                      <option value={5}>5 sec</option><option value={10}>10 sec</option><option value={30}>30 sec</option><option value={60}>1 min</option>
+                    </select>
+                  </div>
+                </div>
+                {bac.physicalId && (
+                  <div className={`p-3 rounded-xl flex items-center gap-2 ${isDarkMode ? 'bg-emerald-500/10' : 'bg-emerald-50'}`}>
+                    <i className="fas fa-link text-emerald-500 text-xs"></i>
+                    <p className={`text-[10px] font-mono truncate ${isDarkMode ? 'text-slate-300' : 'text-slate-600'}`}>{bac.physicalId}</p>
+                  </div>
+                )}
+              </div>
+
+              {/* Automatisation */}
+              <div className="space-y-2">
+                <p className="text-[10px] font-black uppercase text-slate-400 tracking-widest ml-1">Automatisation</p>
+                {[
+                  { key: 'automationEnabled', label: 'Arrosage automatique', desc: 'Arrose quand le sol est trop sec', icon: 'fa-faucet-drip', color: 'bg-blue-500', isDevice: true },
+                  { key: 'autoVentilation', label: 'Ventilation automatique', desc: 'Active le ventilateur si temp. hors plage', icon: 'fa-wind', color: 'bg-amber-500', isDevice: false },
+                  { key: 'autoLighting', label: 'Éclairage automatique', desc: 'Active les LEDs si lumière insuffisante', icon: 'fa-lightbulb', color: 'bg-yellow-500', isDevice: false },
+                ].map(opt => {
+                  const val = opt.isDevice ? (bac as any)[opt.key] : (bac.config as any)[opt.key];
+                  const toggle = () => opt.isDevice ? update({ [opt.key]: !val } as any) : updateCfg({ [opt.key]: !val } as any);
+                  return (
+                    <div key={opt.key} className={`flex items-center justify-between p-4 rounded-2xl ${isDarkMode ? 'bg-slate-800' : 'bg-slate-50'}`}>
+                      <div className="flex items-center gap-3">
+                        <i className={`fas ${opt.icon} w-4 text-center text-sm ${val ? opt.color.replace('bg-', 'text-') : 'text-slate-400'}`}></i>
+                        <div>
+                          <p className={`text-sm font-bold ${isDarkMode ? 'text-slate-200' : 'text-slate-700'}`}>{opt.label}</p>
+                          <p className="text-[10px] text-slate-400">{opt.desc}</p>
+                        </div>
+                      </div>
+                      <button onClick={toggle} className={`relative w-12 h-7 rounded-full transition-colors duration-300 flex-shrink-0 ${val ? opt.color : (isDarkMode ? 'bg-slate-700' : 'bg-slate-300')}`}>
+                        <div className={`absolute top-0.5 w-6 h-6 bg-white rounded-full shadow-md transition-transform duration-300 ${val ? 'translate-x-5' : 'translate-x-0.5'}`}></div>
+                      </button>
+                    </div>
+                  );
+                })}
+              </div>
+              <button onClick={() => setConfiguringBacId(null)} className="w-full py-4 rounded-2xl bg-emerald-600 hover:bg-emerald-700 text-white font-black uppercase tracking-widest">Fermer</button>
+            </div>
+          </div>
+        );
+      })()}
+
+      {/* Modal nouveau bac dans la grille */}
+      {editingBac && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 backdrop-blur-sm" onClick={() => { setEditingBac(null); setNewBacName(''); setNewBacPhysicalId(''); }}>
+          <div className={`w-full max-w-md mx-4 max-h-[90vh] overflow-y-auto ${cardClasses} rounded-[32px] border shadow-2xl p-10 space-y-6`} onClick={e => e.stopPropagation()}>
+            <h3 className={`text-xl font-black ${isDarkMode ? 'text-slate-100' : 'text-slate-800'}`}>
+              <i className="fas fa-box mr-2 text-emerald-500"></i>Nouveau bac
+            </h3>
+            <div className="space-y-2">
+              <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest ml-1">Nom du bac</label>
+              <input
+                type="text" value={newBacName} onChange={e => setNewBacName(e.target.value)}
+                placeholder="Ex: Bac Tomates" autoFocus
+                className={`w-full ${inputClasses} rounded-2xl p-4 font-bold outline-none focus:ring-2 focus:ring-emerald-500`}
+              />
+            </div>
+
+            {/* Lien physique QR / manuel */}
+            {newBacPhysicalId ? (
+              <div className={`p-4 rounded-2xl flex items-center gap-3 ${isDarkMode ? 'bg-emerald-500/10' : 'bg-emerald-50'}`}>
+                <i className="fas fa-link text-emerald-500"></i>
+                <div className="flex-1 min-w-0">
+                  <p className="text-xs font-bold text-emerald-500">Bac physique lié</p>
+                  <p className={`text-[10px] font-mono truncate ${isDarkMode ? 'text-slate-300' : 'text-slate-600'}`}>{newBacPhysicalId}</p>
+                </div>
+                <button onClick={() => setNewBacPhysicalId('')} className="text-slate-400 hover:text-rose-400 text-xs"><i className="fas fa-times"></i></button>
+              </div>
+            ) : (
+              <QRScanner isDark={isDarkMode} onCode={code => setNewBacPhysicalId(code)} />
+            )}
+
+            <div className="flex gap-4 pt-2">
+              <button onClick={() => { setEditingBac(null); setNewBacName(''); setNewBacPhysicalId(''); }} className={`flex-1 py-4 rounded-2xl font-black uppercase tracking-widest ${isDarkMode ? 'bg-slate-800 text-slate-300 hover:bg-slate-700' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}>Annuler</button>
+              <button
+                onClick={() => {
+                  if (!newBacName.trim()) return;
+                  const newBac: Device = {
+                    id: Math.random().toString(36).substr(2, 9),
+                    name: newBacName.trim(),
+                    size: 'Moyen', level: 'Base', locationLabel: '',
+                    stationId: editingBac.stationId,
+                    bacPosition: { row: editingBac.row, col: editingBac.col },
+                    physicalId: newBacPhysicalId || undefined,
+                    isLightOn: false, isFanOn: false,
+                    createdAt: new Date().toISOString(),
+                    isWatering: false, automationEnabled: false,
+                    config: { autoVentilation: false, autoLighting: false, samplingFrequencySec: 30, phCalibrationOffset: 0 },
+                  };
+                  setDevices(prev => [...prev, newBac]);
+                  setEditingBac(null); setNewBacName(''); setNewBacPhysicalId('');
+                }}
+                disabled={!newBacName.trim()}
+                className="flex-1 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-40 text-white py-4 rounded-2xl font-black uppercase tracking-widest shadow-lg shadow-emerald-600/20"
+              >
+                Créer le bac
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Modal édition / création plante */}
       {editingPlant && (

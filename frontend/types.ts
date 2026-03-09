@@ -25,10 +25,17 @@ export type DeviceSize = 'Petit' | 'Moyen' | 'Grand';
 export type DeviceLevel = 'Base' | 'Intermédiaire' | 'Final';
 
 export interface DeviceConfig {
-  hasTempWater: boolean;
-  hasPowerMeter: boolean;
+  autoVentilation: boolean;
+  autoLighting: boolean;
   samplingFrequencySec: number;
   phCalibrationOffset: number;
+}
+
+export interface Station {
+  id: string;
+  name: string;
+  locationLabel: string;
+  createdAt: string;
 }
 
 export interface Device {
@@ -38,6 +45,11 @@ export interface Device {
   level: DeviceLevel;
   locationLabel: string;
   currentPlantProfileId?: string;
+  stationId?: string;
+  bacPosition?: { row: number; col: number };
+  physicalId?: string;
+  isLightOn: boolean;
+  isFanOn: boolean;
   createdAt: string;
   isWatering: boolean;
   lastWatering?: string;
@@ -49,11 +61,10 @@ export interface SensorReading {
   deviceId: string;
   timestamp: string;
   tempAir: number;
-  tempWater: number;
   humidity: number;
   light: number;
   soilPh: number;
-  watts: number;
+  batteryLevel: number;
 }
 
 export enum WateringMode {
@@ -103,6 +114,7 @@ export interface WeatherData {
   description: string;
   icon: string;
   precipProb: number;
+  city?: string;
 }
 
 export type SensorStatus = 'ok' | 'low' | 'high' | 'neutral';

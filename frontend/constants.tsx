@@ -1,5 +1,5 @@
 
-import { PlantProfile, Device, Role, User } from './types';
+import { PlantProfile, Device, Role, User, Station } from './types';
 
 export const INITIAL_PLANTS: PlantProfile[] = [
   {
@@ -40,37 +40,54 @@ export const INITIAL_PLANTS: PlantProfile[] = [
   }
 ];
 
+export const INITIAL_STATIONS: Station[] = [
+  {
+    id: 'station-1',
+    name: 'Station Principale',
+    locationLabel: 'Jardin',
+    createdAt: new Date().toISOString(),
+  }
+];
+
 export const INITIAL_DEVICES: Device[] = [
   {
     id: 'dev-001',
-    name: 'Unité Balcon Sud',
+    name: 'Bac Balcon Sud',
     size: 'Moyen',
     level: 'Intermédiaire',
     locationLabel: 'Balcon Principal',
     currentPlantProfileId: 'p1',
+    stationId: 'station-1',
+    bacPosition: { row: 0, col: 0 },
+    isLightOn: false,
+    isFanOn: false,
     createdAt: new Date().toISOString(),
     isWatering: false,
     automationEnabled: true,
     config: {
-      hasTempWater: true,
-      hasPowerMeter: true,
+      autoVentilation: true,
+      autoLighting: true,
       samplingFrequencySec: 10,
       phCalibrationOffset: 0.1
     }
   },
   {
     id: 'dev-002',
-    name: 'Carré Potager Cuisine',
+    name: 'Bac Potager Cuisine',
     size: 'Petit',
     level: 'Base',
     locationLabel: 'Plan de travail',
     currentPlantProfileId: 'p3',
+    stationId: 'station-1',
+    bacPosition: { row: 0, col: 1 },
+    isLightOn: false,
+    isFanOn: false,
     createdAt: new Date().toISOString(),
     isWatering: false,
     automationEnabled: false,
     config: {
-      hasTempWater: false,
-      hasPowerMeter: false,
+      autoVentilation: false,
+      autoLighting: false,
       samplingFrequencySec: 30,
       phCalibrationOffset: 0
     }
