@@ -11,13 +11,15 @@ import {
   Legend
 } from 'recharts';
 import { SensorReading } from '../types';
+import { t, type Lang } from '../i18n';
 
 interface HistoryChartProps {
   data: SensorReading[];
   isDark?: boolean;
+  lang?: Lang;
 }
 
-const HistoryChart: React.FC<HistoryChartProps> = ({ data, isDark }) => {
+const HistoryChart: React.FC<HistoryChartProps> = ({ data, isDark, lang = 'FR' }) => {
   const formattedData = data.map(d => ({
     ...d,
     time: new Date(d.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
@@ -28,7 +30,7 @@ const HistoryChart: React.FC<HistoryChartProps> = ({ data, isDark }) => {
 
   return (
     <div className={`w-full h-80 p-4 rounded-2xl border transition-colors ${isDark ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-100'}`}>
-      <h3 className={`text-lg font-semibold mb-4 transition-colors ${isDark ? 'text-slate-200' : 'text-slate-700'}`}>Historique (Dernière Heure)</h3>
+      <h3 className={`text-lg font-semibold mb-4 transition-colors ${isDark ? 'text-slate-200' : 'text-slate-700'}`}>{t('chart_title', lang)}</h3>
       <ResponsiveContainer width="100%" height="100%">
         <LineChart data={formattedData}>
           <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={gridColor} />
@@ -65,7 +67,7 @@ const HistoryChart: React.FC<HistoryChartProps> = ({ data, isDark }) => {
           <Line 
             type="monotone" 
             dataKey="humidity" 
-            name="Humidité" 
+            name={t('chart_humidity', lang)}
             stroke="#3b82f6" 
             strokeWidth={2} 
             dot={false} 
@@ -74,7 +76,7 @@ const HistoryChart: React.FC<HistoryChartProps> = ({ data, isDark }) => {
           <Line 
             type="monotone" 
             dataKey="soilPh" 
-            name="pH Sol" 
+            name={t('chart_ph', lang)}
             stroke="#10b981" 
             strokeWidth={2} 
             dot={false} 

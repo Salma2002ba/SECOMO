@@ -21,6 +21,7 @@ import * as wateringService from './services/watering.service';
 import * as stationService from './services/station.service';
 import { getAccessToken } from './services/api';
 import { wsService } from './services/ws.service';
+import { t, type Lang, alertMsg, recMsg, translatePlantName } from './i18n';
 
 // Convertit le format API (snake_case) vers le format frontend (camelCase)
 function apiUserToUser(u: authService.UserOut): User {
@@ -232,6 +233,7 @@ const App: React.FC = () => {
   }, [selectedDevice, plantProfiles]);
 
   const isDarkMode = currentUser?.theme === 'dark';
+  const lang: Lang = currentUser?.language ?? 'FR';
 
   // --- Essayer de restaurer la session au démarrage ---
   useEffect(() => {
@@ -477,28 +479,28 @@ const App: React.FC = () => {
     if (!isAuto) {
       // Mode Manuel : toutes les recommandations actionnables
       if (currentReading.humidity < currentPlant.humidityMin) {
-        recs.push({ id: 'r1', text: `Humidité critique (${currentReading.humidity.toFixed(0)}%) : utilisez le bouton Arroser.`, severity: 'critical', action: 'water' });
+        recs.push({ id: 'r1', text: recMsg('r1', currentReading.humidity, lang), severity: 'critical', action: 'water' });
       }
       if (currentReading.humidity > currentPlant.humidityMax) {
-        recs.push({ id: 'r2', text: `Sol trop humide (${currentReading.humidity.toFixed(0)}%) : suspendez l'arrosage.`, severity: 'warning' });
+        recs.push({ id: 'r2', text: recMsg('r2', currentReading.humidity, lang), severity: 'warning' });
       }
       if (currentReading.tempAir > currentPlant.tempMax) {
-        recs.push({ id: 'r3', text: `Température trop élevée (${currentReading.tempAir.toFixed(1)}°C) : activez la ventilation.`, severity: 'warning', action: 'fan' });
+        recs.push({ id: 'r3', text: recMsg('r3', currentReading.tempAir, lang), severity: 'warning', action: 'fan' });
       }
       if (currentReading.tempAir < currentPlant.tempMin) {
-        recs.push({ id: 'r4', text: `Température trop basse (${currentReading.tempAir.toFixed(1)}°C) : protégez la plante du froid.`, severity: 'warning' });
+        recs.push({ id: 'r4', text: recMsg('r4', currentReading.tempAir, lang), severity: 'warning' });
       }
       if (currentReading.light < currentPlant.lightMin) {
-        recs.push({ id: 'r5', text: `Lumière insuffisante (${currentReading.light.toFixed(0)}%) : activez l'éclairage LED.`, severity: 'info', action: 'light' });
+        recs.push({ id: 'r5', text: recMsg('r5', currentReading.light, lang), severity: 'info', action: 'light' });
       }
     } else {
       // Mode Auto : seulement la luminosité (si insuffisante malgré l'éclairage auto → déplacer le bac)
       if (currentReading.light < currentPlant.lightMin) {
-        recs.push({ id: 'r6', text: `Lumière insuffisante (${currentReading.light.toFixed(0)}%) même avec éclairage automatique. Envisagez de déplacer le bac vers une zone plus lumineuse.`, severity: 'info', action: 'move' });
+        recs.push({ id: 'r6', text: recMsg('r6', currentReading.light, lang), severity: 'info', action: 'move' });
       }
     }
     return recs;
-  }, [currentReading, currentPlant, selectedDevice]);
+  }, [currentReading, currentPlant, selectedDevice, lang]);
 
   // --- Alert Engine (check seulement la plante assignée au device) ---
   const checkAlerts = useCallback((reading: SensorReading, device: Device) => {
@@ -523,14 +525,14 @@ const App: React.FC = () => {
         plantName: plant.name,
         category: 'humidity',
         type: deficit > 15 ? 'critical' : 'warning',
-        message: `Humidité basse : ${reading.humidity.toFixed(0)}% (min ${plant.humidityMin}% pour ${plant.name})`,
+        message: alertMsg('humidity_low', { val: reading.humidity, threshold: plant.humidityMin, plantName: plant.name }, lang),
       });
     } else if (reading.humidity > plant.humidityMax) {
       problems.push({
         plantName: plant.name,
         category: 'humidity',
         type: 'warning',
-        message: `Humidité élevée : ${reading.humidity.toFixed(0)}% (max ${plant.humidityMax}% pour ${plant.name})`,
+        message: alertMsg('humidity_high', { val: reading.humidity, threshold: plant.humidityMax, plantName: plant.name }, lang),
       });
     }
 
@@ -541,7 +543,7 @@ const App: React.FC = () => {
         plantName: plant.name,
         category: 'temperature',
         type: deficit > 5 ? 'critical' : 'warning',
-        message: `Température basse : ${reading.tempAir.toFixed(1)}°C (min ${plant.tempMin}°C pour ${plant.name})`,
+        message: alertMsg('temp_low', { val: reading.tempAir, threshold: plant.tempMin, plantName: plant.name }, lang),
       });
     } else if (reading.tempAir > plant.tempMax) {
       const excess = reading.tempAir - plant.tempMax;
@@ -549,7 +551,7 @@ const App: React.FC = () => {
         plantName: plant.name,
         category: 'temperature',
         type: excess > 5 ? 'critical' : 'warning',
-        message: `Température élevée : ${reading.tempAir.toFixed(1)}°C (max ${plant.tempMax}°C pour ${plant.name})`,
+        message: alertMsg('temp_high', { val: reading.tempAir, threshold: plant.tempMax, plantName: plant.name }, lang),
       });
     }
 
@@ -559,14 +561,14 @@ const App: React.FC = () => {
         plantName: plant.name,
         category: 'ph',
         type: 'warning',
-        message: `pH sol bas : ${reading.soilPh.toFixed(1)} (min ${plant.phMin} pour ${plant.name})`,
+        message: alertMsg('ph_low', { val: reading.soilPh, threshold: plant.phMin, plantName: plant.name }, lang),
       });
     } else if (reading.soilPh > plant.phMax) {
       problems.push({
         plantName: plant.name,
         category: 'ph',
         type: 'warning',
-        message: `pH sol élevé : ${reading.soilPh.toFixed(1)} (max ${plant.phMax} pour ${plant.name})`,
+        message: alertMsg('ph_high', { val: reading.soilPh, threshold: plant.phMax, plantName: plant.name }, lang),
       });
     }
 
@@ -576,7 +578,7 @@ const App: React.FC = () => {
         plantName: plant.name,
         category: 'light',
         type: 'info',
-        message: `Lumière insuffisante : ${reading.light.toFixed(0)}% (min ${plant.lightMin}% pour ${plant.name}). Pensez à activer les LEDs.`,
+        message: alertMsg('light_low', { val: reading.light, threshold: plant.lightMin, plantName: plant.name }, lang),
       });
     }
 
@@ -625,7 +627,7 @@ const App: React.FC = () => {
 
       return updated.slice(0, 200);
     });
-  }, [plantProfiles]);
+  }, [plantProfiles, lang]);
 
   // --- Simulation Engine (actif uniquement si backend offline) ---
   const generateReading = useCallback((deviceId: string, prev?: SensorReading): SensorReading => {
@@ -670,7 +672,7 @@ const App: React.FC = () => {
               timestamp: new Date(now - hoursAgo * 3600 * 1000).toISOString(),
               mode: i % 2 === 0 ? WateringMode.AUTO : WateringMode.MANUAL,
               durationSec: [20, 30, 25, 15, 30][i],
-              reason: i % 2 === 0 ? 'Humidité sol basse (auto)' : 'Arrosage manuel',
+              reason: i % 2 === 0 ? t('sim_reason_auto', lang) : t('sim_reason_manual', lang),
             });
           });
         }
@@ -816,27 +818,27 @@ const App: React.FC = () => {
       } catch { /* silently fail */ }
     }
 
-    setStatusMsg({ text: 'Profil mis à jour avec succès.', type: 'success' });
+    setStatusMsg({ text: t('prof_saved_ok', lang), type: 'success' });
     setTimeout(() => setStatusMsg(null), 3000);
   };
 
   const handleChangePassword = async (e: React.FormEvent) => {
     e.preventDefault();
     if (passwordForm.next !== passwordForm.confirm) {
-      setStatusMsg({ text: 'Les mots de passe ne correspondent pas.', type: 'error' });
+      setStatusMsg({ text: t('prof_pwd_mismatch', lang), type: 'error' });
       return;
     }
 
     if (backendOnline) {
       try {
         await authService.changePassword(passwordForm.current, passwordForm.next);
-        setStatusMsg({ text: 'Mot de passe modifié.', type: 'success' });
+        setStatusMsg({ text: t('prof_pwd_ok', lang), type: 'success' });
       } catch (err: any) {
-        setStatusMsg({ text: err.message || 'Erreur lors du changement.', type: 'error' });
+        setStatusMsg({ text: err.message || t('prof_pwd_error', lang), type: 'error' });
         return;
       }
     } else {
-      setStatusMsg({ text: 'Mot de passe modifié (simulation).', type: 'success' });
+      setStatusMsg({ text: t('prof_pwd_ok_sim', lang), type: 'success' });
     }
 
     setPasswordForm({ current: '', next: '', confirm: '' });
@@ -1205,12 +1207,12 @@ const App: React.FC = () => {
         
         <nav className="flex-1 px-4 space-y-2 mt-4">
           {[
-            { id: 'dashboard', icon: 'fa-chart-pie', label: 'Dashboard' },
-            { id: 'plantes', icon: 'fa-seedling', label: 'Mes Plantes' },
-            { id: 'alerts', icon: 'fa-bell', label: 'Alertes', badge: alerts.filter(a => !a.read).length },
-            { id: 'activities', icon: 'fa-history', label: 'Activités' },
-            { id: 'config', icon: 'fa-sliders', label: 'Configuration' },
-            { id: 'profil', icon: 'fa-user-gear', label: 'Mon Profil' },
+            { id: 'dashboard', icon: 'fa-chart-pie', label: t('nav_dashboard', lang) },
+            { id: 'plantes', icon: 'fa-seedling', label: t('nav_plants', lang) },
+            { id: 'alerts', icon: 'fa-bell', label: t('nav_alerts', lang), badge: alerts.filter(a => !a.read).length },
+            { id: 'activities', icon: 'fa-history', label: t('nav_activities', lang) },
+            { id: 'config', icon: 'fa-sliders', label: t('nav_config', lang) },
+            { id: 'profil', icon: 'fa-user-gear', label: t('nav_profile', lang) },
           ].map(item => (
             <button 
               key={item.id}
@@ -1238,7 +1240,7 @@ const App: React.FC = () => {
           </div>
           <button onClick={handleLogout} className="w-full p-4 text-rose-500 hover:bg-rose-500/10 rounded-2xl transition-colors font-bold flex items-center gap-4">
             <i className="fas fa-power-off w-6 text-center"></i>
-            <span className="hidden lg:block">Déconnexion</span>
+            <span className="hidden lg:block">{t('logout', lang)}</span>
           </button>
         </div>
       </aside>
@@ -1248,9 +1250,9 @@ const App: React.FC = () => {
         <header className={`sticky top-0 z-40 backdrop-blur-xl border-b px-8 py-4 flex items-center justify-between gap-6 transition-colors ${headerClasses}`}>
           {/* Gauche : titre + station */}
           <div className="flex-shrink-0">
-            <h2 className={`text-3xl font-black capitalize tracking-tight ${isDarkMode ? 'text-slate-100' : 'text-slate-800'}`}>{view === 'profil' ? 'Mon Profil' : view}</h2>
+            <h2 className={`text-3xl font-black capitalize tracking-tight ${isDarkMode ? 'text-slate-100' : 'text-slate-800'}`}>{view === 'profil' ? t('prof_title', lang) : view}</h2>
             <p className="text-slate-400 text-sm font-medium">
-              Station: <span className="text-violet-500">{stations.find(s => s.id === selectedStationId)?.name || '—'}</span>
+              {t('header_station', lang)}: <span className="text-violet-500">{stations.find(s => s.id === selectedStationId)?.name || '—'}</span>
             </p>
           </div>
 
@@ -1283,19 +1285,19 @@ const App: React.FC = () => {
                     !selectedDevice.automationEnabled ? 'text-slate-700 font-black' : 'text-white/60 font-bold'
                   }`}>
                     <i className="fas fa-hand-pointer text-xs"></i>
-                    <span className="text-xs uppercase tracking-wide">Manuel</span>
+                    <span className="text-xs uppercase tracking-wide">{t('dash_manual_mode', lang)}</span>
                   </div>
                   <div className={`py-2 px-3 flex items-center justify-center gap-1.5 transition-colors duration-300 ${
                     selectedDevice.automationEnabled ? 'text-violet-700 font-black' : 'text-white/50 font-bold'
                   }`}>
                     <i className="fas fa-robot text-xs"></i>
-                    <span className="text-xs uppercase tracking-wide">Auto</span>
+                    <span className="text-xs uppercase tracking-wide">{t('dash_auto_mode', lang)}</span>
                   </div>
                 </div>
               </div>
               <p className={`text-[10px] text-center leading-tight ${isDarkMode ? 'text-slate-500' : 'text-slate-400'}`}>
                 <i className="fas fa-circle-info mr-1"></i>
-                Paramétrez l'automatisation bac par bac dans <span className={`font-bold ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>Configuration <i className="fas fa-gear text-[9px]"></i></span>
+                {t('dash_auto_info', lang)} <span className={`font-bold ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>{t('nav_config', lang)} <i className="fas fa-gear text-[9px]"></i></span>
               </p>
             </div>
           )}
@@ -1335,7 +1337,7 @@ const App: React.FC = () => {
                   return (
                     <div className="flex items-center gap-3 flex-wrap">
                       <span className={`text-xs font-black uppercase tracking-wider ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>
-                        <i className="fas fa-box mr-2"></i>Bac :
+                        <i className="fas fa-box mr-2"></i>{t('header_bac', lang)} :
                       </span>
                       {stationBacs.map(bac => (
                         <button
@@ -1353,7 +1355,7 @@ const App: React.FC = () => {
                       <button
                         onClick={handleRefresh}
                         disabled={isRefreshing}
-                        title="Actualiser les données capteurs"
+                        title={t('gen_refresh', lang)}
                         className={`ml-auto px-3 py-2 rounded-xl text-xs font-bold transition-all disabled:opacity-50 ${isDarkMode ? 'bg-slate-800 text-slate-400 hover:bg-slate-700 hover:text-violet-400' : 'bg-slate-100 text-slate-500 hover:bg-slate-200 hover:text-violet-600'}`}
                       >
                         <i className={`fas fa-rotate-right ${isRefreshing ? 'animate-spin' : ''}`}></i>
@@ -1364,20 +1366,20 @@ const App: React.FC = () => {
                 {/* Cartes capteurs — placeholder si pas encore de données */}
                 {currentReading ? (
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                    <SensorCard label="Temp Air" value={formatTemp(currentReading.tempAir)} unit={currentUser.unit === 'celsius' ? '°C' : '°F'} status={currentPlant ? getSensorStatus(currentReading.tempAir, currentPlant.tempMin, currentPlant.tempMax) : 'neutral'} targetRange={currentPlant ? `${formatTemp(currentPlant.tempMin).toFixed(0)}-${formatTemp(currentPlant.tempMax).toFixed(0)}°` : '—'} icon="fa-thermometer-half" isDark={isDarkMode} />
-                    <SensorCard label="Humidité" value={currentReading.humidity} unit="%" status={currentPlant ? getSensorStatus(currentReading.humidity, currentPlant.humidityMin, currentPlant.humidityMax) : 'neutral'} targetRange={currentPlant ? `${currentPlant.humidityMin}-${currentPlant.humidityMax}%` : '—'} icon="fa-tint" isDark={isDarkMode} />
-                    <SensorCard label="Lumière" value={currentReading.light} unit="%" status={currentPlant ? (currentReading.light < currentPlant.lightMin ? 'low' : 'ok') : 'neutral'} targetRange={currentPlant ? `Min ${currentPlant.lightMin}%` : '—'} icon="fa-sun" isDark={isDarkMode} />
-                    <SensorCard label="pH Sol" value={currentReading.soilPh} unit="pH" status={currentPlant ? getSensorStatus(currentReading.soilPh, currentPlant.phMin, currentPlant.phMax) : 'neutral'} targetRange={currentPlant ? `${currentPlant.phMin}-${currentPlant.phMax}` : '—'} icon="fa-flask" isDark={isDarkMode} />
-                    <SensorCard label="Batterie" value={Math.round(currentReading.batteryLevel)} unit="%" status={currentReading.batteryLevel < 20 ? 'low' : 'ok'} targetRange="Min 20%" icon="fa-battery-half" isDark={isDarkMode} />
+                    <SensorCard label={t('dash_temp', lang)} value={formatTemp(currentReading.tempAir)} unit={currentUser.unit === 'celsius' ? '°C' : '°F'} status={currentPlant ? getSensorStatus(currentReading.tempAir, currentPlant.tempMin, currentPlant.tempMax) : 'neutral'} targetRange={currentPlant ? `${formatTemp(currentPlant.tempMin).toFixed(0)}-${formatTemp(currentPlant.tempMax).toFixed(0)}°` : '—'} icon="fa-thermometer-half" isDark={isDarkMode} lang={lang} />
+                    <SensorCard label={t('dash_humidity', lang)} value={currentReading.humidity} unit="%" status={currentPlant ? getSensorStatus(currentReading.humidity, currentPlant.humidityMin, currentPlant.humidityMax) : 'neutral'} targetRange={currentPlant ? `${currentPlant.humidityMin}-${currentPlant.humidityMax}%` : '—'} icon="fa-tint" isDark={isDarkMode} lang={lang} />
+                    <SensorCard label={t('dash_light', lang)} value={currentReading.light} unit="%" status={currentPlant ? (currentReading.light < currentPlant.lightMin ? 'low' : 'ok') : 'neutral'} targetRange={currentPlant ? `Min ${currentPlant.lightMin}%` : '—'} icon="fa-sun" isDark={isDarkMode} lang={lang} />
+                    <SensorCard label={t('dash_ph', lang)} value={currentReading.soilPh} unit="pH" status={currentPlant ? getSensorStatus(currentReading.soilPh, currentPlant.phMin, currentPlant.phMax) : 'neutral'} targetRange={currentPlant ? `${currentPlant.phMin}-${currentPlant.phMax}` : '—'} icon="fa-flask" isDark={isDarkMode} lang={lang} />
+                    <SensorCard label={t('dash_battery', lang)} value={Math.round(currentReading.batteryLevel)} unit="%" status={currentReading.batteryLevel < 20 ? 'low' : 'ok'} targetRange="Min 20%" icon="fa-battery-half" isDark={isDarkMode} lang={lang} />
                   </div>
                 ) : (
                   <div className={`${cardClasses} p-12 rounded-[32px] border text-center space-y-4`}>
                     <i className="fas fa-satellite-dish text-4xl text-slate-300 block"></i>
-                    <p className={`font-black text-lg ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>En attente des capteurs</p>
-                    <p className="text-sm text-slate-400">Aucune donnée reçue pour ce bac. Connectez l'ESP32 ou attendez la prochaine mesure.</p>
+                    <p className={`font-black text-lg ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>{t('dash_no_sensor', lang)}</p>
+                    <p className="text-sm text-slate-400">{t('dash_no_sensor_sub', lang)}</p>
                   </div>
                 )}
-                <HistoryChart data={history[selectedDevice.id] || []} isDark={isDarkMode} />
+                <HistoryChart data={history[selectedDevice.id] || []} isDark={isDarkMode} lang={lang} />
 
                 {/* Contrôles Manuels — ligne horizontale sous l'historique, visible seulement en mode MANUEL */}
                 {!selectedDevice.automationEnabled && (
@@ -1398,7 +1400,7 @@ const App: React.FC = () => {
                             <div className={`flex items-center gap-2 px-3 py-2 rounded-xl ${isDarkMode ? 'bg-blue-900/30' : 'bg-blue-50'}`}>
                               <i className="fas fa-droplet text-blue-400 animate-bounce text-sm"></i>
                               <span className={`text-sm font-bold ${isDarkMode ? 'text-blue-300' : 'text-blue-600'}`}>
-                                En cours ({wateringCountdown[selectedDevice.id] ?? 0} sec)
+                                {t('water_in_progress', lang)} ({wateringCountdown[selectedDevice.id] ?? 0} sec)
                               </span>
                             </div>
                           ) : (
@@ -1409,7 +1411,7 @@ const App: React.FC = () => {
                                 onChange={e => setManualDuration(Math.min(120, Math.max(5, +e.target.value)))}
                                 className={`w-20 text-center rounded-xl py-2 font-black text-sm outline-none focus:ring-2 focus:ring-blue-500 ${isDarkMode ? 'bg-slate-800 text-slate-100' : 'bg-slate-100 text-slate-800'}`}
                               />
-                              <span className="text-xs text-slate-400">secondes</span>
+                              <span className="text-xs text-slate-400">{t('water_seconds', lang)}</span>
                             </div>
                           )}
                           <button
@@ -1421,11 +1423,11 @@ const App: React.FC = () => {
                             }`}
                           >
                             <i className={`fas ${selectedDevice.isWatering ? 'fa-stop' : 'fa-faucet-drip'}`}></i>
-                            {selectedDevice.isWatering ? 'Arrêter arrosage' : `Arroser ${manualDuration}s`}
+                            {selectedDevice.isWatering ? t('water_stop', lang) : `${t('water_start', lang)} ${manualDuration}s`}
                           </button>
                           {selectedDevice.lastWatering && (
                             <p className="text-[10px] text-slate-400">
-                              <i className="fas fa-clock mr-1"></i>Dernier : {new Date(selectedDevice.lastWatering).toLocaleString()}
+                              <i className="fas fa-clock mr-1"></i>{t('water_last', lang)} : {new Date(selectedDevice.lastWatering).toLocaleString()}
                             </p>
                           )}
                         </div>
@@ -1453,18 +1455,18 @@ const App: React.FC = () => {
                             }`}
                           >
                             <i className={`fas fa-wind ${selectedDevice.isFanOn ? 'animate-spin' : ''}`} style={selectedDevice.isFanOn ? { animationDuration: '1.5s' } : {}}></i>
-                            {selectedDevice.isFanOn ? `Ventilateur ON — ${manualTargetTemp}°C` : 'Ventilateur OFF'}
+                            {selectedDevice.isFanOn ? `${t('ctrl_fan_on', lang)} — ${manualTargetTemp}°C` : t('ctrl_fan_off', lang)}
                           </button>
                         </div>
 
                         {/* 3. Lumière */}
                         <div className="space-y-3">
                           <p className={`text-xs font-black uppercase tracking-widest flex items-center gap-2 ${isDarkMode ? 'text-yellow-400' : 'text-yellow-600'}`}>
-                            <i className="fas fa-lightbulb"></i> Éclairage LED
+                            <i className="fas fa-lightbulb"></i> {t('ctrl_led', lang)}
                           </p>
                           <div className={`flex items-center gap-3 px-4 py-2 rounded-xl ${isDarkMode ? 'bg-slate-800' : 'bg-slate-100'}`}>
                             <i className={`fas fa-lightbulb text-xl ${selectedDevice.isLightOn ? 'text-yellow-400' : (isDarkMode ? 'text-slate-600' : 'text-slate-300')}`}></i>
-                            <span className={`text-sm font-bold ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>{selectedDevice.isLightOn ? 'Allumée' : 'Éteinte'}</span>
+                            <span className={`text-sm font-bold ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>{selectedDevice.isLightOn ? t('ctrl_light_on', lang) : t('ctrl_light_off', lang)}</span>
                           </div>
                           <button
                             onClick={() => handleToggleLight(selectedDevice.id)}
@@ -1475,7 +1477,7 @@ const App: React.FC = () => {
                             }`}
                           >
                             <i className="fas fa-lightbulb"></i>
-                            {selectedDevice.isLightOn ? 'Éteindre' : 'Allumer'}
+                            {selectedDevice.isLightOn ? t('ctrl_light_turn_off', lang) : t('ctrl_light_turn_on', lang)}
                           </button>
                         </div>
 
@@ -1496,7 +1498,7 @@ const App: React.FC = () => {
                         <i className="fas fa-seedling text-3xl"></i>
                       </div>
                       <div>
-                        <p className={`font-black text-xl ${isDarkMode ? 'text-slate-100' : 'text-slate-800'}`}>{currentPlant.name}</p>
+                        <p className={`font-black text-xl ${isDarkMode ? 'text-slate-100' : 'text-slate-800'}`}>{translatePlantName(currentPlant.name, lang)}</p>
                         <p className="text-xs text-slate-400 italic">"{currentPlant.notes}"</p>
                       </div>
                     </div>
@@ -1505,18 +1507,18 @@ const App: React.FC = () => {
                       <div className="w-16 h-16 bg-slate-200/50 rounded-2xl flex items-center justify-center text-slate-400">
                         <i className="fas fa-circle-question text-2xl"></i>
                       </div>
-                      <p className="text-sm text-slate-400">Aucune plante assignée à ce bac.</p>
+                      <p className="text-sm text-slate-400">{t('plant_no_assigned', lang)}</p>
                     </div>
                   )}
                   <button onClick={() => setView('plantes')} className="w-full p-4 border-2 border-violet-500/20 hover:border-violet-500 hover:text-violet-500 rounded-2xl text-xs font-black uppercase tracking-widest transition-all">
-                    {currentPlant ? 'Changer de Profil' : 'Assigner une plante'}
+                    {currentPlant ? t('plant_edit', lang) : t('rec_assign_plant', lang)}
                   </button>
                 </div>
 
                 {/* Recommandations */}
                 {recommendations.length > 0 && (
                   <div className={`${cardClasses} p-6 rounded-[32px] border shadow-sm space-y-3`}>
-                    <h3 className={`text-base font-black ${isDarkMode ? 'text-slate-100' : 'text-slate-800'}`}>Recommandations</h3>
+                    <h3 className={`text-base font-black ${isDarkMode ? 'text-slate-100' : 'text-slate-800'}`}>{t('rec_title', lang)}</h3>
                     {recommendations.map(rec => (
                       <div key={rec.id} className={`p-4 rounded-2xl flex items-start gap-3 ${
                         rec.severity === 'critical' ? (isDarkMode ? 'bg-rose-500/10' : 'bg-rose-50')
@@ -1541,7 +1543,7 @@ const App: React.FC = () => {
                     className={`w-full px-5 py-3.5 rounded-2xl border flex items-center justify-center gap-2 transition-colors ${isDarkMode ? 'bg-violet-500/10 border-violet-500/30 hover:bg-violet-500/20' : 'bg-violet-50 border-violet-200 hover:bg-violet-100'}`}
                   >
                     <i className="fas fa-lock text-violet-500 text-xs"></i>
-                    <span className="text-xs font-bold text-violet-600">Mode AUTO actif — cliquer pour passer en manuel</span>
+                    <span className="text-xs font-bold text-violet-600">{t('dash_auto_active', lang)}</span>
                   </button>
                 )}
               </div>
@@ -1558,14 +1560,14 @@ const App: React.FC = () => {
                        {currentUser.firstName[0]}
                      </div>
                      <div>
-                       <h3 className={`text-2xl font-black ${isDarkMode ? 'text-slate-100' : 'text-slate-800'}`}>Informations Personnelles</h3>
-                       <p className="text-slate-400 text-sm font-medium">Gérez votre identité et vos coordonnées.</p>
+                       <h3 className={`text-2xl font-black ${isDarkMode ? 'text-slate-100' : 'text-slate-800'}`}>{t('prof_personal_info', lang)}</h3>
+                       <p className="text-slate-400 text-sm font-medium">{t('prof_personal_info_sub', lang)}</p>
                      </div>
                   </div>
 
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div className="space-y-2">
-                      <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest ml-1">Prénom</label>
+                      <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest ml-1">{t('prof_firstname', lang)}</label>
                       <input 
                         type="text" 
                         value={profileForm.firstName} 
@@ -1574,7 +1576,7 @@ const App: React.FC = () => {
                       />
                     </div>
                     <div className="space-y-2">
-                      <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest ml-1">Nom</label>
+                      <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest ml-1">{t('prof_lastname', lang)}</label>
                       <input 
                         type="text" 
                         value={profileForm.lastName} 
@@ -1603,10 +1605,10 @@ const App: React.FC = () => {
                 </section>
 
                 <section className={`${cardClasses} p-10 rounded-[40px] border shadow-sm space-y-8`}>
-                  <h3 className={`text-2xl font-black ${isDarkMode ? 'text-slate-100' : 'text-slate-800'}`}>Sécurité du compte</h3>
+                  <h3 className={`text-2xl font-black ${isDarkMode ? 'text-slate-100' : 'text-slate-800'}`}>{t('prof_security_title', lang)}</h3>
                   <form onSubmit={handleChangePassword} className="space-y-6">
                     <div className="space-y-2">
-                      <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest ml-1">Mot de passe actuel</label>
+                      <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest ml-1">{t('prof_current_pwd', lang)}</label>
                       <input 
                         type="password" 
                         value={passwordForm.current}
@@ -1617,7 +1619,7 @@ const App: React.FC = () => {
                     </div>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                       <div className="space-y-2">
-                        <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest ml-1">Nouveau mot de passe</label>
+                        <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest ml-1">{t('prof_new_pwd', lang)}</label>
                         <input 
                           type="password" 
                           value={passwordForm.next}
@@ -1627,7 +1629,7 @@ const App: React.FC = () => {
                         />
                       </div>
                       <div className="space-y-2">
-                        <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest ml-1">Confirmation</label>
+                        <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest ml-1">{t('prof_confirm_pwd', lang)}</label>
                         <input 
                           type="password" 
                           value={passwordForm.confirm}
@@ -1642,7 +1644,7 @@ const App: React.FC = () => {
                         type="submit"
                         className={`px-8 py-4 rounded-2xl font-black uppercase tracking-widest transition-all active:scale-95 ${isDarkMode ? 'bg-slate-800 hover:bg-slate-700 text-slate-100' : 'bg-slate-200 hover:bg-slate-300 text-slate-700'}`}
                       >
-                        Changer le mot de passe
+                        {t('prof_change_pwd', lang)}
                       </button>
                     </div>
                   </form>
@@ -1652,7 +1654,7 @@ const App: React.FC = () => {
               {/* Right Column: Preferences */}
               <div className="space-y-8">
                 <section className={`${cardClasses} p-10 rounded-[40px] border shadow-sm space-y-8`}>
-                  <h3 className={`text-xl font-black ${isDarkMode ? 'text-slate-100' : 'text-slate-800'}`}>Apparence</h3>
+                  <h3 className={`text-xl font-black ${isDarkMode ? 'text-slate-100' : 'text-slate-800'}`}>{t('prof_appearance', lang)}</h3>
                   <div className="space-y-4">
                     <button 
                       onClick={() => updateProfile({ theme: 'light' })}
@@ -1660,7 +1662,7 @@ const App: React.FC = () => {
                     >
                       <div className="flex items-center gap-4">
                         <i className={`fas fa-sun ${currentUser.theme === 'light' ? 'text-violet-500' : 'text-slate-400'}`}></i>
-                        <span className={`font-bold ${currentUser.theme === 'light' ? 'text-violet-600' : 'text-slate-500'}`}>Tech Calme (Clair)</span>
+                        <span className={`font-bold ${currentUser.theme === 'light' ? 'text-violet-600' : 'text-slate-500'}`}>{t('prof_theme_light_label', lang)}</span>
                       </div>
                       {currentUser.theme === 'light' && <i className="fas fa-check-circle text-violet-500"></i>}
                     </button>
@@ -1670,7 +1672,7 @@ const App: React.FC = () => {
                     >
                       <div className="flex items-center gap-4">
                         <i className={`fas fa-moon ${currentUser.theme === 'dark' ? 'text-violet-500' : 'text-slate-400'}`}></i>
-                        <span className={`font-bold ${currentUser.theme === 'dark' ? 'text-violet-100' : 'text-slate-500'}`}>Dark Soft (Sombre)</span>
+                        <span className={`font-bold ${currentUser.theme === 'dark' ? 'text-violet-100' : 'text-slate-500'}`}>{t('prof_theme_dark_label', lang)}</span>
                       </div>
                       {currentUser.theme === 'dark' && <i className="fas fa-check-circle text-violet-500"></i>}
                     </button>
@@ -1678,11 +1680,11 @@ const App: React.FC = () => {
                 </section>
 
                 <section className={`${cardClasses} p-10 rounded-[40px] border shadow-sm space-y-8`}>
-                  <h3 className={`text-xl font-black ${isDarkMode ? 'text-slate-100' : 'text-slate-800'}`}>Paramètres Généraux</h3>
+                  <h3 className={`text-xl font-black ${isDarkMode ? 'text-slate-100' : 'text-slate-800'}`}>{t('prof_general_settings', lang)}</h3>
                   
                   <div className="space-y-4">
                     <div className="space-y-2">
-                      <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest ml-1">Langue de l'interface</label>
+                      <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest ml-1">{t('prof_language', lang)}</label>
                       <select 
                         value={currentUser.language}
                         onChange={e => updateProfile({ language: e.target.value as LanguageType })}
@@ -1694,7 +1696,7 @@ const App: React.FC = () => {
                     </div>
 
                     <div className="space-y-2">
-                      <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest ml-1">Unités de température</label>
+                      <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest ml-1">{t('prof_unit', lang)}</label>
                       <div className={`flex p-1 rounded-2xl ${isDarkMode ? 'bg-slate-800' : 'bg-slate-100'}`}>
                         <button 
                           onClick={() => updateProfile({ unit: 'celsius' })}
@@ -1712,7 +1714,7 @@ const App: React.FC = () => {
                     </div>
 
                     <div className="space-y-2">
-                      <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest ml-1">Fuseau horaire</label>
+                      <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest ml-1">{t('prof_timezone', lang)}</label>
                       <input 
                         type="text" 
                         value={currentUser.timezone} 
@@ -1724,9 +1726,9 @@ const App: React.FC = () => {
                 </section>
 
                 <div className={`${cardClasses} p-8 rounded-[32px] border text-center opacity-60`}>
-                  <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2">Informations système</p>
-                  <p className="text-xs font-bold text-slate-500">Compte créé le {new Date(currentUser.createdAt).toLocaleDateString()}</p>
-                  <p className="text-[10px] text-slate-400 mt-1">ID Utilisateur: {currentUser.id}</p>
+                  <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2">{t('prof_sys_info', lang)}</p>
+                  <p className="text-xs font-bold text-slate-500">{t('prof_account_created', lang)} {new Date(currentUser.createdAt).toLocaleDateString()}</p>
+                  <p className="text-[10px] text-slate-400 mt-1">{t('prof_user_id', lang)}: {currentUser.id}</p>
                 </div>
               </div>
             </div>
@@ -1767,9 +1769,9 @@ const App: React.FC = () => {
               <div className="flex justify-between items-center flex-wrap gap-4">
                 <div>
                   <p className="text-slate-400 font-medium">
-                    {plantProfiles.length} profil{plantProfiles.length !== 1 ? 's' : ''} au total
+                    {plantProfiles.length} {plantProfiles.length !== 1 ? t('plant_profiles_total', lang) : t('plant_profile_total', lang)}
                     {unlinkedCount > 0 && (
-                      <span className="ml-2 text-rose-400 font-bold">· {unlinkedCount} non lié{unlinkedCount > 1 ? 's' : ''}</span>
+                      <span className="ml-2 text-rose-400 font-bold">· {unlinkedCount} {unlinkedCount > 1 ? t('plant_unlinked_plural', lang) : t('plant_unlinked_single', lang)}</span>
                     )}
                   </p>
                   {/* Légende stations */}
@@ -1791,15 +1793,15 @@ const App: React.FC = () => {
                   onClick={() => setEditingPlant({ id: Math.random().toString(36).substr(2, 9), name: '', humidityMin: 50, humidityMax: 80, tempMin: 15, tempMax: 30, lightMin: 50, phMin: 6, phMax: 7, notes: '' })}
                   className="bg-violet-600 text-white px-6 py-3 rounded-2xl font-bold flex items-center gap-3 shadow-lg shadow-violet-100"
                 >
-                  <i className="fas fa-plus"></i> Nouveau Profil
+                  <i className="fas fa-plus"></i> {t('plant_new', lang)}
                 </button>
               </div>
 
               {plantProfiles.length === 0 && (
                 <div className={`${cardClasses} p-16 rounded-[32px] border text-center`}>
                   <i className="fas fa-seedling text-5xl text-slate-300 mb-6 block"></i>
-                  <p className={`text-xl font-black ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>Aucun profil de plante</p>
-                  <p className="text-sm text-slate-400 mt-2">Créez votre premier profil de culture.</p>
+                  <p className={`text-xl font-black ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>{t('plant_no_plants', lang)}</p>
+                  <p className="text-sm text-slate-400 mt-2">{t('plant_no_plants_sub', lang)}</p>
                 </div>
               )}
 
@@ -1876,8 +1878,8 @@ const App: React.FC = () => {
                           </div>
                         </div>
 
-                        <h3 className={`text-2xl font-black mb-2 ${isDarkMode ? 'text-slate-100' : 'text-slate-800'}`}>{plant.name}</h3>
-                        <p className="text-sm text-slate-400 mb-4 line-clamp-2 h-10">{plant.notes || <span className="italic">Aucune note</span>}</p>
+                        <h3 className={`text-2xl font-black mb-2 ${isDarkMode ? 'text-slate-100' : 'text-slate-800'}`}>{translatePlantName(plant.name, lang)}</h3>
+                        <p className="text-sm text-slate-400 mb-4 line-clamp-2 h-10">{plant.notes || <span className="italic">{t('plant_no_notes', lang)}</span>}</p>
 
                         {/* Badges des stations liées */}
                         {isUnlinked ? (
@@ -1932,7 +1934,7 @@ const App: React.FC = () => {
                               : (isDarkMode ? 'bg-slate-800 hover:bg-violet-600 text-slate-100' : 'bg-slate-100 hover:bg-violet-600 hover:text-white text-slate-600')
                           }`}
                         >
-                          Appliquer au bac sélectionné
+                          {t('plant_apply', lang)}
                         </button>
                       </div>
                       </div>
@@ -1953,12 +1955,12 @@ const App: React.FC = () => {
             <div className="space-y-8">
               {/* En-tête */}
               <div className="flex justify-between items-center">
-                <p className="text-slate-400 font-medium">Gérez vos stations et positionnez vos bacs sur la grille.</p>
+                <p className="text-slate-400 font-medium">{t('cfg_subtitle', lang)}</p>
                 <button
                   onClick={() => setEditingStation({ id: Math.random().toString(36).substr(2, 9), name: '', locationLabel: '', createdAt: new Date().toISOString() })}
                   className="bg-violet-600 text-white px-6 py-3 rounded-2xl font-bold flex items-center gap-3 shadow-lg shadow-violet-100"
                 >
-                  <i className="fas fa-plus"></i> Nouvelle station
+                  <i className="fas fa-plus"></i> {t('cfg_new_station', lang)}
                 </button>
               </div>
 
@@ -1979,8 +1981,8 @@ const App: React.FC = () => {
               {stations.length === 0 && (
                 <div className={`${cardClasses} p-16 rounded-[32px] border text-center`}>
                   <i className="fas fa-layer-group text-5xl text-slate-300 mb-6 block"></i>
-                  <p className={`text-xl font-black ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>Aucune station</p>
-                  <p className="text-sm text-slate-400 mt-2">Créez une station pour organiser vos bacs.</p>
+                  <p className={`text-xl font-black ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>{t('cfg_no_stations', lang)}</p>
+                  <p className="text-sm text-slate-400 mt-2">{t('cfg_no_stations_sub', lang)}</p>
                 </div>
               )}
 
@@ -2000,8 +2002,8 @@ const App: React.FC = () => {
                           <i className="fas fa-layer-group"></i>
                         </div>
                         <div>
-                          <h3 className={`text-xl font-black ${isDarkMode ? 'text-slate-100' : 'text-slate-800'}`}>{station.name || 'Station sans nom'}</h3>
-                          <p className="text-sm text-slate-400"><i className="fas fa-location-dot mr-1"></i>{station.locationLabel || 'Emplacement non défini'} · {stationBacs.length} bac{stationBacs.length !== 1 ? 's' : ''}</p>
+                          <h3 className={`text-xl font-black ${isDarkMode ? 'text-slate-100' : 'text-slate-800'}`}>{station.name || t('cfg_station_no_name', lang)}</h3>
+                          <p className="text-sm text-slate-400"><i className="fas fa-location-dot mr-1"></i>{station.locationLabel || t('cfg_unknown_location', lang)} · {stationBacs.length} {stationBacs.length !== 1 ? t('cfg_bacs', lang) : t('cfg_bac', lang)}</p>
                         </div>
                       </div>
                       <div className="flex items-center gap-3">
@@ -2056,9 +2058,9 @@ const App: React.FC = () => {
                                     >
                                       <p className={`text-[10px] font-black uppercase tracking-wider truncate ${isDarkMode ? 'text-slate-300' : 'text-slate-700'}`}>{bac.name}</p>
                                       {plant ? (
-                                        <p className="text-[10px] text-violet-500 font-bold mt-1 truncate flex items-center gap-1"><i className="fas fa-seedling"></i>{plant.name}</p>
+                                        <p className="text-[10px] text-violet-500 font-bold mt-1 truncate flex items-center gap-1"><i className="fas fa-seedling"></i>{translatePlantName(plant.name, lang)}</p>
                                       ) : (
-                                        <p className="text-[10px] text-rose-400 font-bold mt-1 flex items-center gap-1"><i className="fas fa-exclamation-circle"></i>Aucune plante</p>
+                                        <p className="text-[10px] text-rose-400 font-bold mt-1 flex items-center gap-1"><i className="fas fa-exclamation-circle"></i>{t('cfg_no_plant', lang)}</p>
                                       )}
                                       {/* Assign plant dropdown */}
                                       <select
@@ -2067,11 +2069,11 @@ const App: React.FC = () => {
                                         onClick={e => e.stopPropagation()}
                                         className={`mt-2 w-full text-[9px] rounded-lg p-1 font-bold outline-none cursor-pointer border-0 ${isDarkMode ? 'bg-slate-700 text-slate-300' : 'bg-white text-slate-600'}`}
                                       >
-                                        <option value="">— Aucune plante —</option>
-                                        {plantProfiles.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+                                        <option value="">{t('plant_select_none', lang)}</option>
+                                        {plantProfiles.map(p => <option key={p.id} value={p.id}>{translatePlantName(p.name, lang)}</option>)}
                                       </select>
                                       <div className="absolute top-2 right-2 flex gap-1">
-                                        <button onClick={e => { e.stopPropagation(); setConfiguringBacId(bac.id); }} className="w-5 h-5 rounded-full bg-blue-500/20 text-blue-400 flex items-center justify-center text-[9px] opacity-40 group-hover:opacity-100 hover:bg-blue-500/40 transition-all" title="Paramètres du bac"><i className="fas fa-gear"></i></button>
+                                        <button onClick={e => { e.stopPropagation(); setConfiguringBacId(bac.id); }} className="w-5 h-5 rounded-full bg-blue-500/20 text-blue-400 flex items-center justify-center text-[9px] opacity-40 group-hover:opacity-100 hover:bg-blue-500/40 transition-all" title={t('cfg_bac_settings', lang)}><i className="fas fa-gear"></i></button>
                                         <button onClick={e => { e.stopPropagation(); handleDeleteBac(bac.id); }} className="w-5 h-5 rounded-full bg-rose-500/20 text-rose-400 flex items-center justify-center text-[9px] opacity-0 group-hover:opacity-100 hover:bg-rose-500/40 transition-all"><i className="fas fa-times"></i></button>
                                       </div>
                                     </div>
@@ -2110,16 +2112,16 @@ const App: React.FC = () => {
             <div className="space-y-8">
               <div className="flex items-center justify-between">
                 <p className="text-slate-400 font-medium">
-                  Historique des arrosages sur toutes vos stations.
-                  {uniqueEvents.length > 0 && ` · ${uniqueEvents.length} événement${uniqueEvents.length > 1 ? 's' : ''}`}
+                  {t('act_title', lang)}
+                  {uniqueEvents.length > 0 && ` · ${uniqueEvents.length} ${uniqueEvents.length > 1 ? t('act_events_plural', lang) : t('act_events', lang)}`}
                 </p>
               </div>
 
               {uniqueEvents.length === 0 ? (
                 <div className={`${cardClasses} p-16 rounded-[32px] border text-center`}>
                   <i className="fas fa-history text-5xl text-slate-300 mb-6 block"></i>
-                  <p className={`text-xl font-black ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>Aucune activité</p>
-                  <p className="text-sm text-slate-400 mt-2">Les arrosages et événements apparaîtront ici.</p>
+                  <p className={`text-xl font-black ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>{t('act_no_activity', lang)}</p>
+                  <p className="text-sm text-slate-400 mt-2">{t('act_no_activity_sub', lang)}</p>
                 </div>
               ) : (
                 <div className="space-y-4">
@@ -2151,7 +2153,7 @@ const App: React.FC = () => {
                                 {isAuto ? 'AUTO' : 'MANUEL'}
                               </span>
                               <span className={`text-[10px] font-bold px-2 py-0.5 rounded-lg ${isDarkMode ? 'bg-slate-800 text-slate-400' : 'bg-slate-100 text-slate-500'}`}>
-                                <i className="fas fa-microchip mr-1"></i>{deviceInfo?.name || 'Bac inconnu'}
+                                <i className="fas fa-microchip mr-1"></i>{deviceInfo?.name || t('cfg_bac_unknown', lang)}
                               </span>
                               {stationInfo && (
                                 <span className={`text-[10px] font-bold px-2 py-0.5 rounded-lg ${isDarkMode ? 'bg-violet-900/30 text-violet-400' : 'bg-violet-50 text-violet-600'}`}>
@@ -2254,8 +2256,8 @@ const App: React.FC = () => {
                 <div className="flex justify-between items-center gap-4 flex-wrap">
                   <p className="text-slate-400 font-medium">
                     {alerts.length > 0
-                      ? `${alerts.length} alerte${alerts.length > 1 ? 's' : ''} · ${unreadCount > 0 ? `${unreadCount} non lue${unreadCount > 1 ? 's' : ''}` : 'toutes lues'} · ${totalStationsWithAlerts} station${totalStationsWithAlerts > 1 ? 's' : ''}`
-                      : 'Aucune alerte active'}
+                      ? `${alerts.length} ${alerts.length > 1 ? t('alert_count_plural', lang) : t('alert_count', lang)} · ${unreadCount > 0 ? `${unreadCount} non lue${unreadCount > 1 ? 's' : ''}` : 'toutes lues'} · ${totalStationsWithAlerts} station${totalStationsWithAlerts > 1 ? 's' : ''}`
+                      : t('alert_no_alerts', lang)}
                   </p>
                   {alerts.length > 0 && (
                     <div className="flex items-center gap-2">
@@ -2264,7 +2266,7 @@ const App: React.FC = () => {
                           onClick={markAllRead}
                           className={`px-4 py-2 rounded-2xl text-xs font-bold uppercase tracking-wider transition-all ${isDarkMode ? 'bg-slate-800 text-blue-400 hover:bg-blue-500/20' : 'bg-slate-100 text-blue-600 hover:bg-blue-50'}`}
                         >
-                          <i className="fas fa-check-double mr-1.5"></i>Tout marquer lu
+                          <i className="fas fa-check-double mr-1.5"></i>{t('alert_mark_all', lang)}
                         </button>
                       )}
                       <button
@@ -2280,8 +2282,8 @@ const App: React.FC = () => {
                 {alerts.length === 0 ? (
                   <div className={`${cardClasses} p-16 rounded-[32px] border text-center`}>
                     <i className="fas fa-check-circle text-5xl text-emerald-400 mb-6 block"></i>
-                    <p className={`text-xl font-black ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>Tout va bien</p>
-                    <p className="text-sm text-slate-400 mt-2">Aucune alerte active. Toutes vos plantes sont dans les seuils.</p>
+                    <p className={`text-xl font-black ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>{t('alert_no_alerts', lang)}</p>
+                    <p className="text-sm text-slate-400 mt-2">{t('alert_no_alerts_sub', lang)}</p>
                   </div>
                 ) : (
                   <div className="space-y-10">
@@ -2296,7 +2298,7 @@ const App: React.FC = () => {
                             </div>
                             <div>
                               <h3 className={`text-xl font-black ${isDarkMode ? 'text-slate-100' : 'text-slate-800'}`}>
-                                {station?.name || 'Station inconnue'}
+                                {station?.name || t('alert_unknown_station', lang)}
                               </h3>
                               {station?.locationLabel && (
                                 <p className="text-xs text-slate-400"><i className="fas fa-location-dot mr-1"></i>{station.locationLabel}</p>
@@ -2318,7 +2320,7 @@ const App: React.FC = () => {
                                       <i className={`fas fa-microchip text-[10px] ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}></i>
                                     </div>
                                     <span className={`text-sm font-black ${isDarkMode ? 'text-slate-300' : 'text-slate-600'}`}>
-                                      {deviceInfo?.name || 'Bac inconnu'}
+                                      {deviceInfo?.name || t('cfg_bac_unknown', lang)}
                                     </span>
                                     <span className={`text-[10px] font-bold px-2 py-0.5 rounded-lg ${isDarkMode ? 'bg-slate-800 text-slate-500' : 'bg-slate-100 text-slate-400'}`}>
                                       {deviceAlerts.length} alerte{deviceAlerts.length > 1 ? 's' : ''}
@@ -2349,10 +2351,10 @@ const App: React.FC = () => {
                                               {alert.type}
                                             </span>
                                             {!alert.read && (
-                                              <span className="text-[10px] font-black uppercase tracking-wider text-rose-500 px-1.5 py-0.5 rounded-md bg-rose-500/10">Nouveau</span>
+                                              <span className="text-[10px] font-black uppercase tracking-wider text-rose-500 px-1.5 py-0.5 rounded-md bg-rose-500/10">{t('alert_new', lang)}</span>
                                             )}
                                             <span className={`text-[10px] font-bold px-2 py-0.5 rounded-lg ${isDarkMode ? 'bg-violet-900/40 text-violet-400' : 'bg-violet-100 text-violet-700'}`}>
-                                              <i className="fas fa-seedling mr-1"></i>{alert.plantName}
+                                              <i className="fas fa-seedling mr-1"></i>{translatePlantName(alert.plantName, lang)}
                                             </span>
                                             <span className={`text-[10px] font-bold px-2 py-0.5 rounded-lg ${isDarkMode ? 'bg-slate-800 text-slate-400' : 'bg-slate-200/70 text-slate-500'}`}>
                                               <i className={`fas ${categoryIcon(alert.category)} mr-1`}></i>{alert.category}
@@ -2370,7 +2372,7 @@ const App: React.FC = () => {
                                         <button
                                           onClick={(e) => handleDeleteAlert(e, alert.id)}
                                           className={`opacity-0 group-hover:opacity-100 transition-opacity p-1.5 rounded-xl hover:bg-rose-500/20 flex-shrink-0 ${isDarkMode ? 'text-slate-500 hover:text-rose-400' : 'text-slate-400 hover:text-rose-500'}`}
-                                          title="Supprimer cette alerte"
+                                          title={t('alert_delete', lang)}
                                         >
                                           <i className="fas fa-xmark text-sm"></i>
                                         </button>
@@ -2400,12 +2402,12 @@ const App: React.FC = () => {
             <div className={`w-full max-w-sm mx-4 ${cardClasses} rounded-[32px] border shadow-2xl p-10 space-y-6`} onClick={e => e.stopPropagation()}>
               <div className="text-center space-y-3">
                 <div className="w-16 h-16 bg-rose-500/10 rounded-full flex items-center justify-center mx-auto"><i className="fas fa-trash text-rose-500 text-2xl"></i></div>
-                <h3 className={`text-xl font-black ${isDarkMode ? 'text-slate-100' : 'text-slate-800'}`}>Supprimer la plante ?</h3>
+                <h3 className={`text-xl font-black ${isDarkMode ? 'text-slate-100' : 'text-slate-800'}`}>{t('plant_delete_confirm', lang)}</h3>
                 <p className="text-sm text-slate-400">"{plant?.name}" sera supprimée et désassociée de tous les bacs.</p>
               </div>
               <div className="flex gap-4">
-                <button onClick={() => setDeletingPlantId(null)} className={`flex-1 py-4 rounded-2xl font-black uppercase tracking-widest ${isDarkMode ? 'bg-slate-800 text-slate-300 hover:bg-slate-700' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}>Annuler</button>
-                <button onClick={() => handleDeletePlant(deletingPlantId)} className="flex-1 bg-rose-500 hover:bg-rose-600 text-white py-4 rounded-2xl font-black uppercase tracking-widest shadow-lg shadow-rose-500/20">Supprimer</button>
+                <button onClick={() => setDeletingPlantId(null)} className={`flex-1 py-4 rounded-2xl font-black uppercase tracking-widest ${isDarkMode ? 'bg-slate-800 text-slate-300 hover:bg-slate-700' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}>{t('plant_cancel', lang)}</button>
+                <button onClick={() => handleDeletePlant(deletingPlantId)} className="flex-1 bg-rose-500 hover:bg-rose-600 text-white py-4 rounded-2xl font-black uppercase tracking-widest shadow-lg shadow-rose-500/20">{t('plant_delete_btn', lang)}</button>
               </div>
             </div>
           </div>
@@ -2417,21 +2419,21 @@ const App: React.FC = () => {
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 backdrop-blur-sm" onClick={() => setEditingStation(null)}>
           <div className={`w-full max-w-md mx-4 ${cardClasses} rounded-[32px] border shadow-2xl p-10 space-y-6`} onClick={e => e.stopPropagation()}>
             <h3 className={`text-2xl font-black ${isDarkMode ? 'text-slate-100' : 'text-slate-800'}`}>
-              {stations.find(s => s.id === editingStation.id) ? 'Modifier la station' : 'Nouvelle station'}
+              {stations.find(s => s.id === editingStation.id) ? t('cfg_edit_station', lang) : t('cfg_new_station_title', lang)}
             </h3>
             <div className="space-y-4">
               <div className="space-y-2">
-                <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest ml-1">Nom de la station</label>
-                <input type="text" value={editingStation.name} onChange={e => setEditingStation({ ...editingStation, name: e.target.value })} placeholder="Ex: Station Jardin" className={`w-full ${inputClasses} rounded-2xl p-4 font-bold outline-none focus:ring-2 focus:ring-violet-500`} autoFocus />
+                <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest ml-1">{t('cfg_station_name', lang)}</label>
+                <input type="text" value={editingStation.name} onChange={e => setEditingStation({ ...editingStation, name: e.target.value })} placeholder={t('cfg_station_name_ph', lang)} className={`w-full ${inputClasses} rounded-2xl p-4 font-bold outline-none focus:ring-2 focus:ring-violet-500`} autoFocus />
               </div>
               <div className="space-y-2">
-                <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest ml-1">Emplacement</label>
-                <input type="text" value={editingStation.locationLabel} onChange={e => setEditingStation({ ...editingStation, locationLabel: e.target.value })} placeholder="Ex: Jardin, Balcon, Serre..." className={`w-full ${inputClasses} rounded-2xl p-4 font-bold outline-none focus:ring-2 focus:ring-violet-500`} />
+                <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest ml-1">{t('cfg_station_location', lang)}</label>
+                <input type="text" value={editingStation.locationLabel} onChange={e => setEditingStation({ ...editingStation, locationLabel: e.target.value })} placeholder={t('cfg_station_location_ph', lang)} className={`w-full ${inputClasses} rounded-2xl p-4 font-bold outline-none focus:ring-2 focus:ring-violet-500`} />
               </div>
             </div>
             <div className="flex gap-4 pt-2">
-              <button onClick={() => setEditingStation(null)} className={`flex-1 py-4 rounded-2xl font-black uppercase tracking-widest ${isDarkMode ? 'bg-slate-800 text-slate-300 hover:bg-slate-700' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}>Annuler</button>
-              <button onClick={() => { if (editingStation.name.trim()) handleSaveStation(editingStation); }} className="flex-1 bg-violet-600 hover:bg-violet-700 text-white py-4 rounded-2xl font-black uppercase tracking-widest shadow-lg shadow-violet-600/20">Enregistrer</button>
+              <button onClick={() => setEditingStation(null)} className={`flex-1 py-4 rounded-2xl font-black uppercase tracking-widest ${isDarkMode ? 'bg-slate-800 text-slate-300 hover:bg-slate-700' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}>{t('cfg_cancel', lang)}</button>
+              <button onClick={() => { if (editingStation.name.trim()) handleSaveStation(editingStation); }} className="flex-1 bg-violet-600 hover:bg-violet-700 text-white py-4 rounded-2xl font-black uppercase tracking-widest shadow-lg shadow-violet-600/20">{t('cfg_save', lang)}</button>
             </div>
           </div>
         </div>
@@ -2456,18 +2458,18 @@ const App: React.FC = () => {
               {/* Infos bac */}
               <div className="space-y-3">
                 <div className="space-y-1">
-                  <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest ml-1">Nom</label>
+                  <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest ml-1">{t('cfg_label_name', lang)}</label>
                   <input type="text" value={bac.name} onChange={e => update({ name: e.target.value })} className={`w-full ${inputClasses} rounded-2xl p-3 font-bold outline-none focus:ring-2 focus:ring-violet-500`} />
                 </div>
                 <div className="grid grid-cols-2 gap-3">
                   <div className="space-y-1">
-                    <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest ml-1">Taille</label>
+                    <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest ml-1">{t('cfg_label_size', lang)}</label>
                     <select value={bac.size} onChange={e => update({ size: e.target.value as any })} className={`w-full ${inputClasses} rounded-2xl p-3 font-bold outline-none cursor-pointer`}>
-                      <option value="Petit">Petit (~5L)</option><option value="Moyen">Moyen (~15L)</option><option value="Grand">Grand (~40L)</option>
+                      <option value="Petit">{t('cfg_size_small', lang)}</option><option value="Moyen">{t('cfg_size_medium', lang)}</option><option value="Grand">{t('cfg_size_large', lang)}</option>
                     </select>
                   </div>
                   <div className="space-y-1">
-                    <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest ml-1">Mesures</label>
+                    <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest ml-1">{t('cfg_label_measures', lang)}</label>
                     <select value={bac.config.samplingFrequencySec} onChange={e => updateCfg({ samplingFrequencySec: +e.target.value })} className={`w-full ${inputClasses} rounded-2xl p-3 font-bold outline-none cursor-pointer`}>
                       <option value={5}>5 sec</option><option value={10}>10 sec</option><option value={30}>30 sec</option><option value={60}>1 min</option>
                     </select>
@@ -2483,11 +2485,11 @@ const App: React.FC = () => {
 
               {/* Automatisation */}
               <div className="space-y-2">
-                <p className="text-[10px] font-black uppercase text-slate-400 tracking-widest ml-1">Automatisation</p>
+                <p className="text-[10px] font-black uppercase text-slate-400 tracking-widest ml-1">{t('cfg_label_automation', lang)}</p>
                 {[
-                  { key: 'automationEnabled', label: 'Arrosage automatique', desc: 'Arrose quand le sol est trop sec', icon: 'fa-faucet-drip', color: 'bg-blue-500', isDevice: true },
-                  { key: 'autoVentilation', label: 'Ventilation automatique', desc: 'Active le ventilateur si temp. hors plage', icon: 'fa-wind', color: 'bg-amber-500', isDevice: false },
-                  { key: 'autoLighting', label: 'Éclairage automatique', desc: 'Active les LEDs si lumière insuffisante', icon: 'fa-lightbulb', color: 'bg-yellow-500', isDevice: false },
+                  { key: 'automationEnabled', label: t('cfg_auto_watering', lang), desc: t('cfg_auto_watering_desc', lang), icon: 'fa-faucet-drip', color: 'bg-blue-500', isDevice: true },
+                  { key: 'autoVentilation', label: t('cfg_auto_ventilation', lang), desc: t('cfg_auto_ventilation_desc', lang), icon: 'fa-wind', color: 'bg-amber-500', isDevice: false },
+                  { key: 'autoLighting', label: t('cfg_auto_lighting', lang), desc: t('cfg_auto_lighting_desc', lang), icon: 'fa-lightbulb', color: 'bg-yellow-500', isDevice: false },
                 ].map(opt => {
                   const val = opt.isDevice ? (bac as any)[opt.key] : (bac.config as any)[opt.key];
                   const toggle = () => opt.isDevice ? update({ [opt.key]: !val } as any) : updateCfg({ [opt.key]: !val } as any);
@@ -2507,7 +2509,7 @@ const App: React.FC = () => {
                   );
                 })}
               </div>
-              <button onClick={() => setConfiguringBacId(null)} className="w-full py-4 rounded-2xl bg-violet-600 hover:bg-violet-700 text-white font-black uppercase tracking-widest">Fermer</button>
+              <button onClick={() => setConfiguringBacId(null)} className="w-full py-4 rounded-2xl bg-violet-600 hover:bg-violet-700 text-white font-black uppercase tracking-widest">{t('gen_close', lang)}</button>
             </div>
           </div>
         );
@@ -2521,10 +2523,10 @@ const App: React.FC = () => {
               <i className="fas fa-box mr-2 text-violet-500"></i>Nouveau bac
             </h3>
             <div className="space-y-2">
-              <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest ml-1">Nom du bac</label>
+              <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest ml-1">{t('cfg_bac_name', lang)}</label>
               <input
                 type="text" value={newBacName} onChange={e => setNewBacName(e.target.value)}
-                placeholder="Ex: Bac Tomates" autoFocus
+                placeholder={t('cfg_bac_name_ph', lang)} autoFocus
                 className={`w-full ${inputClasses} rounded-2xl p-4 font-bold outline-none focus:ring-2 focus:ring-violet-500`}
               />
             </div>
@@ -2544,7 +2546,7 @@ const App: React.FC = () => {
             )}
 
             <div className="flex gap-4 pt-2">
-              <button onClick={() => { setEditingBac(null); setNewBacName(''); setNewBacPhysicalId(''); }} className={`flex-1 py-4 rounded-2xl font-black uppercase tracking-widest ${isDarkMode ? 'bg-slate-800 text-slate-300 hover:bg-slate-700' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}>Annuler</button>
+              <button onClick={() => { setEditingBac(null); setNewBacName(''); setNewBacPhysicalId(''); }} className={`flex-1 py-4 rounded-2xl font-black uppercase tracking-widest ${isDarkMode ? 'bg-slate-800 text-slate-300 hover:bg-slate-700' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}>{t('cfg_cancel', lang)}</button>
               <button
                 onClick={() => {
                   if (!newBacName.trim()) return;
@@ -2569,13 +2571,13 @@ const App: React.FC = () => {
             onClick={e => e.stopPropagation()}
           >
             <h3 className={`text-2xl font-black ${isDarkMode ? 'text-slate-100' : 'text-slate-800'}`}>
-              {plantProfiles.find(p => p.id === editingPlant.id) ? 'Modifier le profil' : 'Nouveau profil de plante'}
+              {plantProfiles.find(p => p.id === editingPlant.id) ? t('plant_edit_profile', lang) : t('plant_new_profile', lang)}
             </h3>
 
             {/* Recherche dans le catalogue (5500+ plantes) */}
             <div className="space-y-2">
               <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest ml-1">
-                <i className="fas fa-search mr-1"></i> Rechercher une plante dans le catalogue (5500+ espèces)
+                <i className="fas fa-search mr-1"></i> {t('plant_catalog_search', lang)}
               </label>
               <div className="relative">
                 <input
@@ -2626,7 +2628,7 @@ const App: React.FC = () => {
 
             <div className="space-y-5">
               <div className="space-y-2">
-                <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest ml-1">Nom de la plante</label>
+                <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest ml-1">{t('plant_name', lang)}</label>
                 <input
                   type="text"
                   value={editingPlant.name}
@@ -2756,7 +2758,7 @@ const App: React.FC = () => {
               </div>
 
               <div className="space-y-2">
-                <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest ml-1">Notes / Description</label>
+                <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest ml-1">{t('plant_notes', lang)}</label>
                 <textarea
                   value={editingPlant.notes}
                   onChange={e => setEditingPlant({ ...editingPlant, notes: e.target.value })}
@@ -2772,13 +2774,13 @@ const App: React.FC = () => {
                 onClick={() => setEditingPlant(null)}
                 className={`flex-1 py-4 rounded-2xl font-black uppercase tracking-widest transition-all active:scale-95 ${isDarkMode ? 'bg-slate-800 text-slate-300 hover:bg-slate-700' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}
               >
-                Annuler
+                {t('plant_cancel', lang)}
               </button>
               <button
                 onClick={() => { if (editingPlant.name.trim()) handlePlantSave(editingPlant); }}
                 className="flex-1 bg-violet-600 hover:bg-violet-700 text-white py-4 rounded-2xl font-black uppercase tracking-widest transition-all shadow-lg shadow-violet-600/20 active:scale-95"
               >
-                Enregistrer
+                {t('plant_save', lang)}
               </button>
             </div>
           </div>

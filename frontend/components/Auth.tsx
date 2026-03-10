@@ -1,14 +1,16 @@
 
 import React from 'react';
+import { t, type Lang } from '../i18n';
 
 interface AuthProps {
   type: 'login' | 'register';
   onBack: () => void;
   onSwitch: () => void;
   onSuccess: (email: string, password?: string, firstName?: string, lastName?: string, isRegister?: boolean) => void;
+  lang?: Lang;
 }
 
-const Auth: React.FC<AuthProps> = ({ type, onBack, onSwitch, onSuccess }) => {
+const Auth: React.FC<AuthProps> = ({ type, onBack, onSwitch, onSuccess, lang = 'FR' }) => {
   const [email, setEmail] = React.useState('');
   const [password, setPassword] = React.useState('');
   const [firstName, setFirstName] = React.useState('');
@@ -45,10 +47,10 @@ const Auth: React.FC<AuthProps> = ({ type, onBack, onSwitch, onSuccess }) => {
               <i className={`fas ${type === 'login' ? 'fa-lock' : 'fa-user-plus'} text-xl text-violet-400`} />
             </div>
             <h2 className="text-2xl font-bold text-white tracking-tight">
-              {type === 'login' ? 'Ravi de vous revoir' : 'Rejoindre SECOMO'}
+              {type === 'login' ? t('auth_login_title', lang) : t('auth_register_title', lang)}
             </h2>
             <p className="text-zinc-400 text-sm font-medium mt-2">
-              {type === 'login' ? 'Accédez à votre dashboard' : 'Créez votre compte et pilotez vos bacs'}
+              {type === 'login' ? t('auth_login_subtitle', lang) : t('auth_register_subtitle', lang)}
             </p>
           </div>
 
@@ -79,7 +81,7 @@ const Auth: React.FC<AuthProps> = ({ type, onBack, onSwitch, onSuccess }) => {
             {type === 'register' && (
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <label className="text-[10px] font-bold uppercase text-zinc-400 tracking-widest ml-1">Prénom</label>
+                  <label className="text-[10px] font-bold uppercase text-zinc-400 tracking-widest ml-1">{t('auth_firstname', lang)}</label>
                   <input
                     type="text"
                     required
@@ -90,7 +92,7 @@ const Auth: React.FC<AuthProps> = ({ type, onBack, onSwitch, onSuccess }) => {
                   />
                 </div>
                 <div className="space-y-2">
-                  <label className="text-[10px] font-bold uppercase text-zinc-400 tracking-widest ml-1">Nom</label>
+                  <label className="text-[10px] font-bold uppercase text-zinc-400 tracking-widest ml-1">{t('auth_lastname', lang)}</label>
                   <input
                     type="text"
                     required
@@ -105,7 +107,7 @@ const Auth: React.FC<AuthProps> = ({ type, onBack, onSwitch, onSuccess }) => {
 
             <div className="space-y-2">
               <label className="text-[10px] font-bold uppercase text-zinc-400 tracking-widest ml-1">
-                Adresse email
+                {t('auth_email', lang)}
               </label>
               <div className="relative">
                 <i className="fas fa-envelope absolute left-4 top-1/2 -translate-y-1/2 text-zinc-500" />
@@ -122,7 +124,7 @@ const Auth: React.FC<AuthProps> = ({ type, onBack, onSwitch, onSuccess }) => {
 
             <div className="space-y-2">
               <label className="text-[10px] font-bold uppercase text-zinc-400 tracking-widest ml-1">
-                Mot de passe
+                {t('auth_password', lang)}
               </label>
               <div className="relative">
                 <i className="fas fa-key absolute left-4 top-1/2 -translate-y-1/2 text-zinc-500" />
@@ -145,15 +147,15 @@ const Auth: React.FC<AuthProps> = ({ type, onBack, onSwitch, onSuccess }) => {
                   className="mt-1 w-4 h-4 rounded border-zinc-600 bg-zinc-800 text-violet-500 focus:ring-violet-500 focus:ring-offset-0 focus:ring-2"
                 />
                 <span className="text-xs text-zinc-400 font-medium">
-                  J'accepte les{' '}
+                  {t('auth_cgu', lang)}{' '}
                   <button
                     type="button"
                     onClick={() => setShowConditions(true)}
                     className="text-violet-400 font-semibold hover:text-violet-300 hover:underline transition-colors"
                   >
-                    conditions générales d'utilisation
+                    {t('auth_cgu_link', lang)}
                   </button>
-                  {' '}du POC SECOMO
+                  {' '}{t('auth_cgu_suffix', lang)}
                 </span>
               </div>
             )}
@@ -164,22 +166,22 @@ const Auth: React.FC<AuthProps> = ({ type, onBack, onSwitch, onSuccess }) => {
               className="w-full bg-gradient-to-r from-violet-600 to-purple-600 hover:from-violet-500 hover:to-purple-500 text-white font-bold py-3.5 rounded-xl transition-all duration-300 shadow-lg shadow-violet-500/25 hover:scale-[1.02] active:scale-[0.98] flex items-center justify-center gap-2 group disabled:opacity-60 disabled:cursor-not-allowed"
             >
               {loading ? (
-                <><i className="fas fa-spinner fa-spin mr-2"></i>Connexion...</>
+                <><i className="fas fa-spinner fa-spin mr-2"></i>{t('auth_connecting', lang)}</>
               ) : (
-                <>{type === 'login' ? 'Se connecter' : 'Créer un compte'}<i className="fas fa-arrow-right text-sm group-hover:translate-x-1 transition-transform duration-300 opacity-80" /></>
+                <>{type === 'login' ? t('auth_login_btn', lang) : t('auth_register_btn', lang)}<i className="fas fa-arrow-right text-sm group-hover:translate-x-1 transition-transform duration-300 opacity-80" /></>
               )}
             </button>
           </form>
 
           <div className="mt-8 text-center">
             <p className="text-zinc-400 text-sm font-medium">
-              {type === 'login' ? 'Pas encore de compte ?' : 'Déjà inscrit ?'}{' '}
+              {type === 'login' ? t('auth_no_account', lang) : t('auth_already_account', lang)}{' '}
               <button
                 type="button"
                 onClick={onSwitch}
                 className="text-violet-400 font-semibold hover:text-violet-300 hover:underline transition-colors"
               >
-                Cliquez ici
+                {t('auth_click_here', lang)}
               </button>
             </p>
           </div>
@@ -200,7 +202,7 @@ const Auth: React.FC<AuthProps> = ({ type, onBack, onSwitch, onSuccess }) => {
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-center justify-between p-6 border-b border-zinc-700">
-              <h3 className="text-lg font-bold text-white">Conditions générales d'utilisation</h3>
+              <h3 className="text-lg font-bold text-white">{t('cgu_title', lang)}</h3>
               <button
                 type="button"
                 onClick={() => setShowConditions(false)}
@@ -238,7 +240,7 @@ const Auth: React.FC<AuthProps> = ({ type, onBack, onSwitch, onSuccess }) => {
                 onClick={() => setShowConditions(false)}
                 className="w-full bg-gradient-to-r from-violet-600 to-purple-600 hover:from-violet-500 hover:to-purple-500 text-white font-bold py-3 rounded-xl transition-all duration-300 hover:scale-[1.02] active:scale-[0.98]"
               >
-                J'ai compris
+                {t('cgu_understood', lang)}
               </button>
             </div>
           </div>

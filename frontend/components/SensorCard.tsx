@@ -1,6 +1,7 @@
 
 import React from 'react';
 import { SensorStatus } from '../types';
+import { t, type Lang } from '../i18n';
 
 interface SensorCardProps {
   label: string;
@@ -11,9 +12,10 @@ interface SensorCardProps {
   icon: string;
   hidden?: boolean;
   isDark?: boolean;
+  lang?: Lang;
 }
 
-const SensorCard: React.FC<SensorCardProps> = ({ label, value, unit, status, targetRange, icon, hidden, isDark }) => {
+const SensorCard: React.FC<SensorCardProps> = ({ label, value, unit, status, targetRange, icon, hidden, isDark, lang = 'FR' }) => {
   if (hidden) return null;
 
   const statusStyles = {
@@ -24,10 +26,10 @@ const SensorCard: React.FC<SensorCardProps> = ({ label, value, unit, status, tar
   };
 
   const statusLabels = {
-    ok: 'Conforme',
-    low: 'Trop Bas',
-    high: 'Trop Haut',
-    neutral: 'Inactif'
+    ok: t('dash_status_conforme', lang),
+    low: t('dash_status_trop_bas', lang),
+    high: t('dash_status_trop_haut', lang),
+    neutral: t('dash_status_inactif', lang),
   };
 
   return (
