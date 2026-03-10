@@ -272,16 +272,30 @@ const App: React.FC = () => {
           ...(localMeta.deviceMeta[d.id] || {}),
         }));
 
-        const finalDevs = devsWithMeta.length > 0 ? devsWithMeta : INITIAL_DEVICES;
+        // Quand le backend est en ligne : utiliser les vraies données (même vides)
+        // Ne jamais injecter INITIAL_* sur un compte réel — ça masquait les vraies données
+        const finalDevs = devsWithMeta;
         const finalStations = localMeta.stations.length > 0 ? localMeta.stations : INITIAL_STATIONS;
 
         setDevices(finalDevs);
         setStations(finalStations);
-        setPlantProfiles(plants.length > 0 ? plants : INITIAL_PLANTS);
+        setPlantProfiles(plants);
         const firstDev = finalDevs[0];
-        setSelectedDeviceId(firstDev.id);
-        setSelectedStationId(firstDev.stationId || finalStations[0]?.id || null);
+        setSelectedDeviceId(firstDev?.id ?? null);
+        setSelectedStationId(firstDev?.stationId || finalStations[0]?.id || null);
         setBackendOnline(true);
+
+        // Charger la plant_config de chaque device (plante assignée)
+        for (const dev of devsWithMeta) {
+          try {
+            const config = await deviceService.getPlantConfig(dev.id);
+            if (config?.plant_id) {
+              setDevices(prev => prev.map(d =>
+                d.id === dev.id ? { ...d, currentPlantProfileId: config.plant_id! } : d
+              ));
+            }
+          } catch { /* pas de config encore */ }
+        }
 
         // Charger l'historique des readings pour chaque device
         for (const dev of devs) {

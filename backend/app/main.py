@@ -6,7 +6,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.config import get_settings
 from app.database import Base, engine, async_session
 from app.routers import auth, users, plants, devices, sensors, commands, alerts, watering, catalog, ws
-from app.services.seed import seed_default_plants
+from app.services.seed import seed_default_plants, seed_test_account
 
 settings = get_settings()
 
@@ -19,6 +19,7 @@ async def lifespan(app: FastAPI):
 
     async with async_session() as db:
         await seed_default_plants(db)
+        await seed_test_account(db)
 
     yield
 
