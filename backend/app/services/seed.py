@@ -4,6 +4,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.models.device import Device
 from app.models.plant import Plant
 from app.models.plant_config import PlantConfig
+from app.models.station import Station
 from app.models.user import User
 from app.utils.auth import hash_password
 
@@ -71,6 +72,7 @@ TEST_EMAIL = "test@secomo.io"
 TEST_PASSWORD = "Test1234!"
 
 # Chaque device avec le nom de la plante à associer (depuis les plants globaux)
+# _bac_row / _bac_col : position dans la grille de la station "Serre Test"
 TEST_DEVICES = [
     {
         "name": "Bac Principal",
@@ -79,6 +81,8 @@ TEST_DEVICES = [
         "location_label": "Serre centrale",
         "automation_enabled": True,
         "_plant_name": "Basilic Grand Vert",
+        "_bac_row": 0,
+        "_bac_col": 0,
     },
     {
         "name": "Bac Aromatiques",
@@ -87,6 +91,8 @@ TEST_DEVICES = [
         "location_label": "Bord de fenêtre",
         "automation_enabled": False,
         "_plant_name": "Menthe Poivrée",
+        "_bac_row": 0,
+        "_bac_col": 1,
     },
     {
         "name": "Bac Tomates",
@@ -95,6 +101,8 @@ TEST_DEVICES = [
         "location_label": "Paroi Sud",
         "automation_enabled": True,
         "_plant_name": "Tomates Cerises",
+        "_bac_row": 1,
+        "_bac_col": 0,
     },
 ]
 
@@ -125,9 +133,16 @@ async def seed_test_account(db: AsyncSession) -> None:
     db.add(user)
     await db.flush()  # génère user.id sans commit
 
-    # 2. Créer les 3 bacs et les associer aux plantes globales
+    # 2. Créer la station "Serre Test"
+    station = Station(user_id=user.id, name="Serre Test", location_label="Serre principale")
+    db.add(station)
+    await db.flush()  # génère station.id
+
+    # 3. Créer les 3 bacs et les associer aux plantes globales + à la station
     for dev_data in TEST_DEVICES:
         plant_name = dev_data.pop("_plant_name")
+        bac_row = dev_data.pop("_bac_row")
+        bac_col = dev_data.pop("_bac_col")
 
         # Récupérer la plante globale correspondante
         plant_result = await db.execute(
@@ -135,7 +150,13 @@ async def seed_test_account(db: AsyncSession) -> None:
         )
         plant = plant_result.scalar_one_or_none()
 
-        device = Device(user_id=user.id, **dev_data)
+        device = Device(
+            user_id=user.id,
+            station_id=station.id,
+            bac_row=bac_row,
+            bac_col=bac_col,
+            **dev_data,
+        )
         db.add(device)
         await db.flush()  # génère device.id
 
@@ -158,4 +179,5 @@ async def seed_test_account(db: AsyncSession) -> None:
 
     await db.commit()
     print(f"[SEED] ✓ Compte test créé — {TEST_EMAIL} / {TEST_PASSWORD}")
+    print(f"[SEED] ✓ Station 'Serre Test' créée")
     print(f"[SEED] ✓ 3 bacs créés : Bac Principal, Bac Aromatiques, Bac Tomates")

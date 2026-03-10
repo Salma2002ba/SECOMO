@@ -17,6 +17,9 @@ class DeviceUpdate(BaseModel):
     level: str | None = Field(default=None, pattern=r"^(Base|Intermédiaire|Final)$")
     location_label: str | None = None
     automation_enabled: bool | None = None
+    station_id: uuid.UUID | None = None
+    bac_row: int | None = None
+    bac_col: int | None = None
 
 
 class DeviceOut(BaseModel):
@@ -30,6 +33,9 @@ class DeviceOut(BaseModel):
     is_online: bool
     last_seen_at: datetime | None
     created_at: datetime
+    station_id: uuid.UUID | None
+    bac_row: int | None
+    bac_col: int | None
 
     model_config = {"from_attributes": True}
 

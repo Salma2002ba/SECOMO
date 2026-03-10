@@ -18,6 +18,7 @@ import * as deviceService from './services/device.service';
 import * as plantService from './services/plant.service';
 import * as sensorService from './services/sensor.service';
 import * as wateringService from './services/watering.service';
+import * as stationService from './services/station.service';
 import { getAccessToken } from './services/api';
 import { wsService } from './services/ws.service';
 
@@ -38,6 +39,8 @@ function apiDeviceToDevice(d: deviceService.DeviceOut): Device {
     locationLabel: d.location_label, createdAt: d.created_at,
     isWatering: false, automationEnabled: d.automation_enabled,
     isLightOn: false, isFanOn: false,
+    stationId: d.station_id || undefined,
+    bacPosition: (d.bac_row != null && d.bac_col != null) ? { row: d.bac_row, col: d.bac_col } : undefined,
     config: { autoVentilation: false, autoLighting: false, samplingFrequencySec: 10, phCalibrationOffset: 0 },
   };
 }
@@ -134,8 +137,6 @@ const SwipeSlider: React.FC<{
 interface LocalMeta {
   stations: Station[];
   deviceMeta: Record<string, {
-    stationId?: string;
-    bacPosition?: { row: number; col: number };
     currentPlantProfileId?: string;
   }>;
 }
@@ -211,6 +212,7 @@ const App: React.FC = () => {
   const [manualDuration, setManualDuration] = useState(15);
   const [manualTargetTemp, setManualTargetTemp] = useState(22);
   const [wateringCountdown, setWateringCountdown] = useState<Record<string, number>>({});
+  const [isRefreshing, setIsRefreshing] = useState(false);
 
   // --- Computed ---
   const selectedDevice = useMemo(() => 
@@ -256,92 +258,104 @@ const App: React.FC = () => {
     prevUserIdRef.current = currentUser.id;
 
     const loadData = async () => {
+      // 1. Tenter de joindre le backend
+      let apiDevices: Awaited<ReturnType<typeof deviceService.getDevices>> = [];
+      let apiPlants: Awaited<ReturnType<typeof plantService.getPlants>> = [];
+      let backendReachable = false;
+
       try {
-        // Charger devices et plantes depuis l'API
-        const [apiDevices, apiPlants] = await Promise.all([
+        [apiDevices, apiPlants] = await Promise.all([
           deviceService.getDevices(),
           plantService.getPlants(),
         ]);
-        const devs = apiDevices.map(apiDeviceToDevice);
-        const plants = apiPlants.map(apiPlantToProfile);
-
-        // Fusionner avec les métadonnées locales (stations, positions, plante assignée)
-        const localMeta = loadLocalMeta(currentUser.id);
-        const devsWithMeta = devs.map(d => ({
-          ...d,
-          ...(localMeta.deviceMeta[d.id] || {}),
-        }));
-
-        // Quand le backend est en ligne : utiliser les vraies données (même vides)
-        // Ne jamais injecter INITIAL_* sur un compte réel — ça masquait les vraies données
-        const finalDevs = devsWithMeta;
-        const finalStations = localMeta.stations.length > 0 ? localMeta.stations : INITIAL_STATIONS;
-
-        setDevices(finalDevs);
-        setStations(finalStations);
-        setPlantProfiles(plants);
-        const firstDev = finalDevs[0];
-        setSelectedDeviceId(firstDev?.id ?? null);
-        setSelectedStationId(firstDev?.stationId || finalStations[0]?.id || null);
-        setBackendOnline(true);
-
-        // Charger la plant_config de chaque device (plante assignée)
-        for (const dev of devsWithMeta) {
-          try {
-            const config = await deviceService.getPlantConfig(dev.id);
-            if (config?.plant_id) {
-              setDevices(prev => prev.map(d =>
-                d.id === dev.id ? { ...d, currentPlantProfileId: config.plant_id! } : d
-              ));
-            }
-          } catch { /* pas de config encore */ }
-        }
-
-        // Charger l'historique des readings pour chaque device
-        for (const dev of devs) {
-          try {
-            const readings = await sensorService.getReadings(dev.id, 60);
-            if (readings.length > 0) {
-              setHistory(prev => ({
-                ...prev,
-                [dev.id]: readings.map(r => apiReadingToReading(r, dev.id)),
-              }));
-            }
-          } catch { /* pas de readings encore */ }
-        }
-
-        // Charger l'historique d'arrosage
-        setWateringEvents([]); // Réinitialiser pour éviter les doublons
-        for (const dev of devs) {
-          try {
-            const events = await wateringService.getWateringHistory(dev.id, 50);
-            setWateringEvents(prev => [
-              ...prev,
-              ...events.map(e => ({
-                id: e.id,
-                deviceId: e.device_id,
-                timestamp: e.started_at,
-                mode: e.mode as WateringMode,
-                durationSec: e.duration_sec,
-                reason: e.reason || '',
-              })),
-            ]);
-          } catch { /* pas d'events */ }
-        }
-
-        // Connecter le WebSocket
-        const token = getAccessToken();
-        if (token) {
-          wsService.connect(token);
-        }
+        backendReachable = true;
       } catch {
-        // Backend indisponible → fallback simulation
-        console.log('[SECOMO] Backend indisponible, mode simulation activé');
+        // Backend vraiment injoignable → mode simulation
+        console.log('[SECOMO] Backend injoignable, mode simulation activé');
         setBackendOnline(false);
         setDevices(INITIAL_DEVICES);
         setPlantProfiles(INITIAL_PLANTS);
         setSelectedDeviceId(INITIAL_DEVICES[0].id);
         simulationActive.current = true;
+        return;
+      }
+
+      if (!backendReachable) return;
+
+      // 2. Backend joignable : traiter les données réelles (même si vides)
+      const devs = apiDevices.map(apiDeviceToDevice);
+      const plants = apiPlants.map(apiPlantToProfile);
+
+      // Fusionner avec les métadonnées locales (seul currentPlantProfileId reste en localStorage)
+      const localMeta = loadLocalMeta(currentUser.id);
+      const devsWithMeta = devs.map(d => ({
+        ...d,
+        // Only restore currentPlantProfileId from localStorage (stationId/bacPosition now from API)
+        currentPlantProfileId: localMeta.deviceMeta[d.id]?.currentPlantProfileId || d.currentPlantProfileId,
+      }));
+
+      // Load stations from backend
+      const apiStations = await stationService.getStations().catch(() => []);
+      const finalStations = apiStations.length > 0
+        ? apiStations.map(s => ({ id: s.id, name: s.name, locationLabel: s.location_label, createdAt: s.created_at }))
+        : (localMeta.stations.length > 0 ? localMeta.stations : INITIAL_STATIONS);
+
+      setDevices(devsWithMeta);
+      setStations(finalStations);
+      setPlantProfiles(plants);
+      const firstDev = devsWithMeta[0];
+      setSelectedDeviceId(firstDev?.id ?? null);
+      setSelectedStationId(firstDev?.stationId || finalStations[0]?.id || null);
+      setBackendOnline(true);
+
+      // 3. Charger la plant_config de chaque device (plante assignée)
+      for (const dev of devsWithMeta) {
+        try {
+          const config = await deviceService.getPlantConfig(dev.id);
+          if (config?.plant_id) {
+            setDevices(prev => prev.map(d =>
+              d.id === dev.id ? { ...d, currentPlantProfileId: config.plant_id! } : d
+            ));
+          }
+        } catch { /* pas de config encore */ }
+      }
+
+      // 4. Charger l'historique des readings pour chaque device
+      for (const dev of devs) {
+        try {
+          const readings = await sensorService.getReadings(dev.id, 60);
+          if (readings.length > 0) {
+            setHistory(prev => ({
+              ...prev,
+              [dev.id]: readings.map(r => apiReadingToReading(r, dev.id)),
+            }));
+          }
+        } catch { /* pas de readings encore */ }
+      }
+
+      // 5. Charger l'historique d'arrosage
+      setWateringEvents([]);
+      for (const dev of devs) {
+        try {
+          const events = await wateringService.getWateringHistory(dev.id, 50);
+          setWateringEvents(prev => [
+            ...prev,
+            ...events.map(e => ({
+              id: e.id,
+              deviceId: e.device_id,
+              timestamp: e.started_at,
+              mode: e.mode as WateringMode,
+              durationSec: e.duration_sec,
+              reason: e.reason || '',
+            })),
+          ]);
+        } catch { /* pas d'events */ }
+      }
+
+      // 6. Connecter le WebSocket
+      const token = getAccessToken();
+      if (token) {
+        wsService.connect(token);
       }
     };
 
@@ -646,18 +660,20 @@ const App: React.FC = () => {
         }
         initialHistory[dev.id] = readings;
 
-        // Générer quelques événements d'arrosage simulés dans les dernières 48h
-        const now = Date.now();
-        [48, 36, 24, 12, 4].forEach((hoursAgo, i) => {
-          initialEvents.push({
-            id: `sim-${dev.id}-${i}`,
-            deviceId: dev.id,
-            timestamp: new Date(now - hoursAgo * 3600 * 1000).toISOString(),
-            mode: i % 2 === 0 ? WateringMode.AUTO : WateringMode.MANUAL,
-            durationSec: [20, 30, 25, 15, 30][i],
-            reason: i % 2 === 0 ? 'Humidité sol basse (auto)' : 'Arrosage manuel',
+        // Générer des événements d'arrosage simulés uniquement en mode hors-ligne
+        if (!backendOnline) {
+          const now = Date.now();
+          [48, 36, 24, 12, 4].forEach((hoursAgo, i) => {
+            initialEvents.push({
+              id: `sim-${dev.id}-${i}`,
+              deviceId: dev.id,
+              timestamp: new Date(now - hoursAgo * 3600 * 1000).toISOString(),
+              mode: i % 2 === 0 ? WateringMode.AUTO : WateringMode.MANUAL,
+              durationSec: [20, 30, 25, 15, 30][i],
+              reason: i % 2 === 0 ? 'Humidité sol basse (auto)' : 'Arrosage manuel',
+            });
           });
-        });
+        }
       });
       setHistory(initialHistory);
       setWateringEvents(prev => {
@@ -695,6 +711,24 @@ const App: React.FC = () => {
     });
   }, [history, devices, checkAlerts]);
 
+  // --- Auto-init données quand un bac sélectionné n'a aucun historique ---
+  useEffect(() => {
+    if (!selectedDeviceId) return;
+    if ((history[selectedDeviceId]?.length ?? 0) > 0) return; // déjà des données
+
+    // Générer des lectures initiales simulées pour ce bac (backend offline ou pas encore de données ESP32)
+    setHistory(prev => {
+      if ((prev[selectedDeviceId]?.length ?? 0) > 0) return prev; // double-check
+      const readings: SensorReading[] = [];
+      let last: SensorReading | undefined;
+      for (let i = 0; i < 10; i++) {
+        last = generateReading(selectedDeviceId, last);
+        readings.push(last);
+      }
+      return { ...prev, [selectedDeviceId]: readings };
+    });
+  }, [selectedDeviceId, history, generateReading]);
+
   // --- Actions ---
   const handleAuthSuccess = async (email: string, password?: string, firstName?: string, lastName?: string, isRegister?: boolean) => {
     try {
@@ -727,6 +761,9 @@ const App: React.FC = () => {
   const handleLogout = () => {
     authService.logout();
     wsService.disconnect();
+    // Réinitialiser les refs pour permettre un rechargement complet à la prochaine connexion
+    prevUserIdRef.current = null;
+    simulationActive.current = false;
     setCurrentUser(null);
     setDevices([]);
     setPlantProfiles([]);
@@ -747,21 +784,20 @@ const App: React.FC = () => {
     }
   }, [selectedStationId, devices]);
 
-  // Sauvegarder les métadonnées locales dès que stations ou devices changent
+  // Sauvegarder les métadonnées locales dès que devices changent
+  // stationId/bacPosition sont maintenant en DB — on ne persiste que currentPlantProfileId
   useEffect(() => {
     if (!currentUser || !devices.length) return;
     const meta: LocalMeta = {
-      stations,
+      stations: [],  // no longer needed in localStorage
       deviceMeta: Object.fromEntries(
         devices.map(d => [d.id, {
-          stationId: d.stationId,
-          bacPosition: d.bacPosition,
           currentPlantProfileId: d.currentPlantProfileId,
         }])
       ),
     };
     saveLocalMeta(currentUser.id, meta);
-  }, [stations, devices, currentUser]);
+  }, [devices, currentUser]);
 
   const updateProfile = async (updates: Partial<User>) => {
     if (!currentUser) return;
@@ -973,8 +1009,18 @@ const App: React.FC = () => {
   };
 
   // --- Station CRUD ---
-  const handleSaveStation = (station: Station) => {
+  const handleSaveStation = async (station: Station) => {
     const exists = stations.find(s => s.id === station.id);
+    if (backendOnline) {
+      try {
+        if (exists) {
+          await stationService.updateStation(station.id, { name: station.name, location_label: station.locationLabel || '' });
+        } else {
+          const created = await stationService.createStation({ name: station.name, location_label: station.locationLabel || '' });
+          station = { ...station, id: created.id, createdAt: created.created_at };
+        }
+      } catch { /* fallback local */ }
+    }
     if (exists) {
       setStations(prev => prev.map(s => s.id === station.id ? station : s));
     } else {
@@ -984,10 +1030,28 @@ const App: React.FC = () => {
     setEditingStation(null);
   };
 
-  const handleDeleteStation = (stationId: string) => {
+  const handleDeleteStation = async (stationId: string) => {
+    // Collecter les IDs des bacs de cette station avant suppression
+    const stationDeviceIds = devices.filter(d => d.stationId === stationId).map(d => d.id);
+
+    // Supprimer bacs + alertes liées immédiatement
+    setDevices(prev => prev.filter(d => d.stationId !== stationId));
+    setAlerts(prev => prev.filter(a => !stationDeviceIds.includes(a.deviceId)));
+
+    // Si le bac sélectionné était dans cette station, en sélectionner un autre
+    if (stationDeviceIds.includes(selectedDeviceId ?? '')) {
+      const remaining = devices.filter(d => d.stationId !== stationId);
+      setSelectedDeviceId(remaining[0]?.id ?? null);
+    }
+
     setStations(prev => prev.filter(s => s.id !== stationId));
-    setDevices(prev => prev.map(d => d.stationId === stationId ? { ...d, stationId: undefined, bacPosition: undefined } : d));
     if (expandedStationId === stationId) setExpandedStationId(null);
+
+    if (backendOnline) {
+      // Supprimer les bacs en DB d'abord, puis la station
+      await Promise.all(stationDeviceIds.map(id => deviceService.deleteDevice(id).catch(() => {})));
+      try { await stationService.deleteStation(stationId); } catch { /* silently fail */ }
+    }
   };
 
   // --- Bac Grid ---
@@ -1018,9 +1082,11 @@ const App: React.FC = () => {
     setEditingBac(null);
     setNewBacName('');
 
+    let newBacId: string;
     if (backendOnline) {
       try {
         const created = await deviceService.createDevice({ name, size: 'Moyen', level: 'Base', location_label: '' });
+        await deviceService.updateDevice(created.id, { station_id: stationId, bac_row: row, bac_col: col }).catch(() => {});
         const newBac: Device = {
           id: created.id, name: created.name, size: 'Moyen', level: 'Base',
           locationLabel: '', stationId, bacPosition: { row, col },
@@ -1029,24 +1095,90 @@ const App: React.FC = () => {
           config: { autoVentilation: false, autoLighting: false, samplingFrequencySec: 30, phCalibrationOffset: 0 },
         };
         setDevices(prev => [...prev, newBac]);
-        return;
-      } catch { /* fallback local */ }
+        newBacId = created.id;
+      } catch {
+        // fallback local
+        newBacId = Math.random().toString(36).substr(2, 9);
+        const newBac: Device = {
+          id: newBacId, name, size: 'Moyen', level: 'Base', locationLabel: '',
+          stationId, bacPosition: { row, col },
+          isLightOn: false, isFanOn: false, createdAt: new Date().toISOString(),
+          isWatering: false, automationEnabled: false,
+          config: { autoVentilation: false, autoLighting: false, samplingFrequencySec: 30, phCalibrationOffset: 0 },
+        };
+        setDevices(prev => [...prev, newBac]);
+      }
+    } else {
+      newBacId = Math.random().toString(36).substr(2, 9);
+      const newBac: Device = {
+        id: newBacId, name, size: 'Moyen', level: 'Base', locationLabel: '',
+        stationId, bacPosition: { row, col },
+        isLightOn: false, isFanOn: false, createdAt: new Date().toISOString(),
+        isWatering: false, automationEnabled: false,
+        config: { autoVentilation: false, autoLighting: false, samplingFrequencySec: 30, phCalibrationOffset: 0 },
+      };
+      setDevices(prev => [...prev, newBac]);
     }
-    // Mode hors-ligne
-    const newBac: Device = {
-      id: Math.random().toString(36).substr(2, 9),
-      name, size: 'Moyen', level: 'Base', locationLabel: '',
-      stationId, bacPosition: { row, col },
-      isLightOn: false, isFanOn: false, createdAt: new Date().toISOString(),
-      isWatering: false, automationEnabled: false,
-      config: { autoVentilation: false, autoLighting: false, samplingFrequencySec: 30, phCalibrationOffset: 0 },
-    };
-    setDevices(prev => [...prev, newBac]);
+
+    // Générer immédiatement les données initiales simulées pour ce nouveau bac
+    setHistory(prev => {
+      const readings: SensorReading[] = [];
+      let last: SensorReading | undefined;
+      for (let i = 0; i < 10; i++) {
+        last = generateReading(newBacId, last);
+        readings.push(last);
+      }
+      return { ...prev, [newBacId]: readings };
+    });
   };
 
-  const handleDeleteBac = (bacId: string) => {
+  const handleDeleteBac = async (bacId: string) => {
     setDevices(prev => prev.filter(d => d.id !== bacId));
+    setAlerts(prev => prev.filter(a => a.deviceId !== bacId));
     if (selectedDeviceId === bacId) setSelectedDeviceId(devices.find(d => d.id !== bacId)?.id ?? null);
+    if (backendOnline) {
+      try { await deviceService.deleteDevice(bacId); } catch { /* silently fail */ }
+    }
+  };
+
+  // --- Refresh capteurs ---
+  // Génère une nouvelle lecture simulée pour un bac donné
+  const refreshDeviceSim = useCallback((deviceId: string) => {
+    setHistory(prev => {
+      const deviceHistory = [...(prev[deviceId] || [])];
+      const lastReading = deviceHistory[deviceHistory.length - 1];
+      const newReading = generateReading(deviceId, lastReading);
+      deviceHistory.push(newReading);
+      if (deviceHistory.length > 60) deviceHistory.shift();
+      return { ...prev, [deviceId]: deviceHistory };
+    });
+  }, [generateReading]);
+
+  // Refresh un seul bac (backend ou simulation)
+  const refreshDevice = useCallback(async (deviceId: string) => {
+    if (backendOnline) {
+      try {
+        const readings = await sensorService.getReadings(deviceId, 60);
+        if (readings.length > 0) {
+          setHistory(prev => ({ ...prev, [deviceId]: readings.map(r => apiReadingToReading(r, deviceId)) }));
+          return;
+        }
+      } catch { /* fallback simulation */ }
+    }
+    refreshDeviceSim(deviceId);
+  }, [backendOnline, refreshDeviceSim]);
+
+  // Refresh tous les bacs
+  const handleRefresh = async () => {
+    if (isRefreshing) return;
+    setIsRefreshing(true);
+    try {
+      for (const dev of devices) {
+        await refreshDevice(dev.id);
+      }
+    } finally {
+      setIsRefreshing(false);
+    }
   };
 
   // --- Styles ---
@@ -1057,7 +1189,7 @@ const App: React.FC = () => {
   const inputClasses = isDarkMode ? 'bg-slate-800 border-slate-700 text-slate-100' : 'bg-slate-50 border-none text-slate-800';
 
   if (page === 'landing' && !currentUser) return <Landing onNavigate={(p) => setPage(p)} />;
-  if ((page === 'login' || page === 'register') && !currentUser) return <Auth type={page} onBack={() => setPage('landing')} onSuccess={handleAuthSuccess} />;
+  if ((page === 'login' || page === 'register') && !currentUser) return <Auth type={page} onBack={() => setPage('landing')} onSwitch={() => setPage(page === 'login' ? 'register' : 'login')} onSuccess={handleAuthSuccess} />;
   if (!currentUser) return <Landing onNavigate={(p) => setPage(p)} />;
 
   return (
@@ -1126,12 +1258,17 @@ const App: React.FC = () => {
           {view === 'dashboard' && selectedDevice && (
             <div className="flex flex-col items-center gap-1.5 flex-shrink-0">
               <div
-                onClick={() => setDevices(prev => prev.map(d => d.id === selectedDevice.id ? {
-                  ...d,
-                  automationEnabled: !d.automationEnabled,
-                  // Passage en AUTO : éteindre ventilateur et lumière (arrosage en cours se termine)
-                  ...(!d.automationEnabled ? { isFanOn: false, isLightOn: false } : {}),
-                } : d))}
+                onClick={async () => {
+                  const newVal = !selectedDevice.automationEnabled;
+                  setDevices(prev => prev.map(d => d.id === selectedDevice.id ? {
+                    ...d,
+                    automationEnabled: newVal,
+                    ...(newVal ? { isFanOn: false, isLightOn: false } : {}),
+                  } : d));
+                  if (backendOnline) {
+                    try { await deviceService.updateDevice(selectedDevice.id, { automation_enabled: newVal }); } catch { /* silently fail */ }
+                  }
+                }}
                 className={`relative cursor-pointer rounded-2xl p-0.5 transition-all duration-300 shadow-md select-none w-44 ${
                   selectedDevice.automationEnabled
                     ? 'bg-violet-500 shadow-violet-500/30'
@@ -1213,6 +1350,14 @@ const App: React.FC = () => {
                           {bac.name}{bac.physicalId ? ' ⚡' : ''}
                         </button>
                       ))}
+                      <button
+                        onClick={handleRefresh}
+                        disabled={isRefreshing}
+                        title="Actualiser les données capteurs"
+                        className={`ml-auto px-3 py-2 rounded-xl text-xs font-bold transition-all disabled:opacity-50 ${isDarkMode ? 'bg-slate-800 text-slate-400 hover:bg-slate-700 hover:text-violet-400' : 'bg-slate-100 text-slate-500 hover:bg-slate-200 hover:text-violet-600'}`}
+                      >
+                        <i className={`fas fa-rotate-right ${isRefreshing ? 'animate-spin' : ''}`}></i>
+                      </button>
                     </div>
                   );
                 })()}
@@ -1757,9 +1902,27 @@ const App: React.FC = () => {
                         )}
 
                         <button
-                          onClick={() => {
+                          onClick={async () => {
                             if (selectedDeviceId) {
                               setDevices(prev => prev.map(d => d.id === selectedDeviceId ? { ...d, currentPlantProfileId: plant.id } : d));
+                              if (backendOnline) {
+                                try {
+                                  await deviceService.setPlantConfig(selectedDeviceId, {
+                                    plant_id: plant.id,
+                                    name: plant.name,
+                                    humidity_min: plant.humidityMin,
+                                    humidity_max: plant.humidityMax,
+                                    temp_min: plant.tempMin,
+                                    temp_max: plant.tempMax,
+                                    light_min: plant.lightMin,
+                                    ph_min: plant.phMin,
+                                    ph_max: plant.phMax,
+                                    notes: plant.notes || '',
+                                  });
+                                } catch { /* fallback local */ }
+                              }
+                              // Refresh immédiat du bac pour avoir des données à jour avec la nouvelle plante
+                              await refreshDevice(selectedDeviceId);
                               setView('dashboard');
                             }
                           }}
@@ -2385,20 +2548,8 @@ const App: React.FC = () => {
               <button
                 onClick={() => {
                   if (!newBacName.trim()) return;
-                  const newBac: Device = {
-                    id: Math.random().toString(36).substr(2, 9),
-                    name: newBacName.trim(),
-                    size: 'Moyen', level: 'Base', locationLabel: '',
-                    stationId: editingBac.stationId,
-                    bacPosition: { row: editingBac.row, col: editingBac.col },
-                    physicalId: newBacPhysicalId || undefined,
-                    isLightOn: false, isFanOn: false,
-                    createdAt: new Date().toISOString(),
-                    isWatering: false, automationEnabled: false,
-                    config: { autoVentilation: false, autoLighting: false, samplingFrequencySec: 30, phCalibrationOffset: 0 },
-                  };
-                  setDevices(prev => [...prev, newBac]);
-                  setEditingBac(null); setNewBacName(''); setNewBacPhysicalId('');
+                  handleCreateBac(editingBac.stationId, editingBac.row, editingBac.col);
+                  setEditingBac(null); setNewBacPhysicalId('');
                 }}
                 disabled={!newBacName.trim()}
                 className="flex-1 bg-violet-600 hover:bg-violet-700 disabled:opacity-40 text-white py-4 rounded-2xl font-black uppercase tracking-widest shadow-lg shadow-violet-600/20"

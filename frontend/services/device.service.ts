@@ -11,6 +11,9 @@ export interface DeviceOut {
   is_online: boolean;
   last_seen_at: string | null;
   created_at: string;
+  station_id: string | null;
+  bac_row: number | null;
+  bac_col: number | null;
 }
 
 export interface PlantConfigOut {
@@ -52,6 +55,9 @@ export async function updateDevice(
     level: string;
     location_label: string;
     automation_enabled: boolean;
+    station_id: string | null;
+    bac_row: number | null;
+    bac_col: number | null;
   }>,
 ): Promise<DeviceOut> {
   return apiFetch<DeviceOut>(`/api/devices/${deviceId}`, {

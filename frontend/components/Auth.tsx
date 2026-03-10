@@ -4,10 +4,11 @@ import React from 'react';
 interface AuthProps {
   type: 'login' | 'register';
   onBack: () => void;
+  onSwitch: () => void;
   onSuccess: (email: string, password?: string, firstName?: string, lastName?: string, isRegister?: boolean) => void;
 }
 
-const Auth: React.FC<AuthProps> = ({ type, onBack, onSuccess }) => {
+const Auth: React.FC<AuthProps> = ({ type, onBack, onSwitch, onSuccess }) => {
   const [email, setEmail] = React.useState('');
   const [password, setPassword] = React.useState('');
   const [firstName, setFirstName] = React.useState('');
@@ -175,7 +176,7 @@ const Auth: React.FC<AuthProps> = ({ type, onBack, onSuccess }) => {
               {type === 'login' ? 'Pas encore de compte ?' : 'Déjà inscrit ?'}{' '}
               <button
                 type="button"
-                onClick={onBack}
+                onClick={onSwitch}
                 className="text-violet-400 font-semibold hover:text-violet-300 hover:underline transition-colors"
               >
                 Cliquez ici

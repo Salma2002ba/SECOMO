@@ -28,3 +28,4 @@ class User(Base):
     )
 
     devices = relationship("Device", back_populates="owner", cascade="all, delete-orphan")
+    stations = relationship("Station", back_populates="owner", cascade="all, delete-orphan")

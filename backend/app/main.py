@@ -5,7 +5,8 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import get_settings
 from app.database import Base, engine, async_session
-from app.routers import auth, users, plants, devices, sensors, commands, alerts, watering, catalog, ws
+from app.models.station import Station  # noqa: F401 — ensures table is registered
+from app.routers import auth, users, plants, devices, sensors, commands, alerts, watering, catalog, ws, stations
 from app.services.seed import seed_default_plants, seed_test_account
 
 settings = get_settings()
@@ -52,6 +53,7 @@ app.include_router(alerts.router)
 app.include_router(watering.router)
 app.include_router(catalog.router)
 app.include_router(ws.router)
+app.include_router(stations.router)
 
 
 @app.get("/api/health")

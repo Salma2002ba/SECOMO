@@ -2,7 +2,7 @@ import uuid
 import secrets
 from datetime import datetime, timezone
 
-from sqlalchemy import String, Boolean, DateTime, ForeignKey
+from sqlalchemy import String, Boolean, DateTime, ForeignKey, Integer
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -29,6 +29,11 @@ class Device(Base):
     size: Mapped[str] = mapped_column(String(20), default="Moyen")
     level: Mapped[str] = mapped_column(String(20), default="Base")
     location_label: Mapped[str | None] = mapped_column(String(200), default="")
+    station_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("stations.id", ondelete="SET NULL"), nullable=True
+    )
+    bac_row: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    bac_col: Mapped[int | None] = mapped_column(Integer, nullable=True)
     automation_enabled: Mapped[bool] = mapped_column(Boolean, default=False)
     is_online: Mapped[bool] = mapped_column(Boolean, default=False)
     last_seen_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
@@ -37,6 +42,7 @@ class Device(Base):
     )
 
     owner = relationship("User", back_populates="devices")
+    station = relationship("Station")
     plant_config = relationship(
         "PlantConfig", back_populates="device", uselist=False, cascade="all, delete-orphan"
     )
