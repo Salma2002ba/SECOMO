@@ -114,7 +114,7 @@ const SwipeSlider: React.FC<{
         onMouseDown={e => { e.preventDefault(); draggingRef.current = true; startXRef.current = e.clientX; startValueRef.current = value; }}
         onTouchStart={e => { draggingRef.current = true; startXRef.current = e.touches[0].clientX; startValueRef.current = value; }}
       >
-        <div className={`h-full transition-none ${color.includes('blue') ? 'bg-blue-600' : color.includes('amber') ? 'bg-amber-500' : 'bg-emerald-600'}`} style={{ width: `${pct}%` }} />
+        <div className={`h-full transition-none ${color.includes('blue') ? 'bg-blue-600' : color.includes('amber') ? 'bg-amber-500' : 'bg-violet-600'}`} style={{ width: `${pct}%` }} />
         <div className="absolute inset-0 flex items-center justify-center gap-2">
           <i className="fas fa-arrows-left-right text-white/60 text-xs"></i>
           <span className="text-xs font-bold text-white/70">Glisser pour ajuster</span>
@@ -127,6 +127,43 @@ const SwipeSlider: React.FC<{
   );
 };
 
+// ============================================================
+// Persistence localStorage — stations + métadonnées devices
+// (le backend ne connaît pas les stations ni les bacPositions)
+// ============================================================
+interface LocalMeta {
+  stations: Station[];
+  deviceMeta: Record<string, {
+    stationId?: string;
+    bacPosition?: { row: number; col: number };
+    currentPlantProfileId?: string;
+  }>;
+}
+
+function getLocalMetaKey(userId: string) {
+  return `secomo_meta_${userId}`;
+}
+
+function loadLocalMeta(userId: string): LocalMeta {
+  try {
+    const raw = localStorage.getItem(getLocalMetaKey(userId));
+    if (raw) return JSON.parse(raw);
+  } catch { /* ignore */ }
+  return { stations: [], deviceMeta: {} };
+}
+
+function saveLocalMeta(userId: string, meta: LocalMeta) {
+  try {
+    localStorage.setItem(getLocalMetaKey(userId), JSON.stringify(meta));
+  } catch { /* ignore */ }
+}
+
+// Valeurs de base de simulation par device — calibrées pour générer des alertes réalistes
+const SIM_BASES: Record<string, { tempAir: number; humidity: number; light: number; soilPh: number }> = {
+  'dev-001': { tempAir: 31, humidity: 48, light: 55, soilPh: 6.3 }, // Basilic : temp haute + humidité basse
+  'dev-002': { tempAir: 20, humidity: 58, light: 38, soilPh: 6.5 }, // Menthe : humidité basse + lumière basse
+};
+
 const App: React.FC = () => {
   // --- Routing & Auth State ---
   const [page, setPage] = useState<'landing' | 'login' | 'register' | 'app'>('landing');
@@ -136,12 +173,16 @@ const App: React.FC = () => {
   // --- Main App State ---
   const [devices, setDevices] = useState<Device[]>([]);
   const [selectedDeviceId, setSelectedDeviceId] = useState<string | null>(null);
+  const [selectedStationId, setSelectedStationId] = useState<string | null>(INITIAL_STATIONS[0]?.id ?? null);
   const [plantProfiles, setPlantProfiles] = useState<PlantProfile[]>([]);
   const [history, setHistory] = useState<Record<string, SensorReading[]>>({});
   const [alerts, setAlerts] = useState<Alert[]>([]);
   const [wateringEvents, setWateringEvents] = useState<WateringEvent[]>([]);
   const [view, setView] = useState<'dashboard' | 'plantes' | 'alerts' | 'config' | 'activities' | 'profil'>('dashboard');
   const simulationActive = useRef(false);
+  const prevUserIdRef = useRef<string | null>(null);
+  const wateringTimeouts = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
+  const countdownIntervals = useRef<Record<string, ReturnType<typeof setInterval>>>({});
 
   // --- Profile Page State ---
   const [profileForm, setProfileForm] = useState<Partial<User>>({});
@@ -169,6 +210,7 @@ const App: React.FC = () => {
   // --- Mode Manuel State ---
   const [manualDuration, setManualDuration] = useState(15);
   const [manualTargetTemp, setManualTargetTemp] = useState(22);
+  const [wateringCountdown, setWateringCountdown] = useState<Record<string, number>>({});
 
   // --- Computed ---
   const selectedDevice = useMemo(() => 
@@ -209,6 +251,9 @@ const App: React.FC = () => {
   // --- Charger les données quand l'user est connecté ---
   useEffect(() => {
     if (!currentUser) return;
+    // Ne recharger que lors d'un vrai changement de compte (login), pas sur theme/langue
+    if (prevUserIdRef.current === currentUser.id) return;
+    prevUserIdRef.current = currentUser.id;
 
     const loadData = async () => {
       try {
@@ -220,9 +265,22 @@ const App: React.FC = () => {
         const devs = apiDevices.map(apiDeviceToDevice);
         const plants = apiPlants.map(apiPlantToProfile);
 
-        setDevices(devs.length > 0 ? devs : INITIAL_DEVICES);
+        // Fusionner avec les métadonnées locales (stations, positions, plante assignée)
+        const localMeta = loadLocalMeta(currentUser.id);
+        const devsWithMeta = devs.map(d => ({
+          ...d,
+          ...(localMeta.deviceMeta[d.id] || {}),
+        }));
+
+        const finalDevs = devsWithMeta.length > 0 ? devsWithMeta : INITIAL_DEVICES;
+        const finalStations = localMeta.stations.length > 0 ? localMeta.stations : INITIAL_STATIONS;
+
+        setDevices(finalDevs);
+        setStations(finalStations);
         setPlantProfiles(plants.length > 0 ? plants : INITIAL_PLANTS);
-        setSelectedDeviceId(devs.length > 0 ? devs[0].id : INITIAL_DEVICES[0].id);
+        const firstDev = finalDevs[0];
+        setSelectedDeviceId(firstDev.id);
+        setSelectedStationId(firstDev.stationId || finalStations[0]?.id || null);
         setBackendOnline(true);
 
         // Charger l'historique des readings pour chaque device
@@ -239,6 +297,7 @@ const App: React.FC = () => {
         }
 
         // Charger l'historique d'arrosage
+        setWateringEvents([]); // Réinitialiser pour éviter les doublons
         for (const dev of devs) {
           try {
             const events = await wateringService.getWateringHistory(dev.id, 50);
@@ -413,78 +472,85 @@ const App: React.FC = () => {
     return recs;
   }, [currentReading, currentPlant, selectedDevice]);
 
-  // --- Alert Engine (check TOUTES les plantes pour chaque reading) ---
+  // --- Alert Engine (check seulement la plante assignée au device) ---
   const checkAlerts = useCallback((reading: SensorReading, device: Device) => {
     const now = new Date().toISOString();
 
-    // Collecter les problèmes pour CHAQUE plante
+    // On ne vérifie que la plante assignée à ce device
+    const assignedPlant = plantProfiles.find(p => p.id === device.currentPlantProfileId);
+    if (!assignedPlant) {
+      // Pas de plante assignée → effacer les alertes de ce device
+      setAlerts(prev => prev.filter(a => a.deviceId !== device.id));
+      return;
+    }
+
     const problems: { plantName: string; category: AlertCategory; type: AlertType; message: string }[] = [];
 
-    plantProfiles.forEach(plant => {
-      // Humidité
-      if (reading.humidity < plant.humidityMin) {
-        const deficit = plant.humidityMin - reading.humidity;
-        problems.push({
-          plantName: plant.name,
-          category: 'humidity',
-          type: deficit > 15 ? 'critical' : 'warning',
-          message: `Humidité basse : ${reading.humidity.toFixed(0)}% (min ${plant.humidityMin}% pour ${plant.name})`,
-        });
-      } else if (reading.humidity > plant.humidityMax) {
-        problems.push({
-          plantName: plant.name,
-          category: 'humidity',
-          type: 'warning',
-          message: `Humidité élevée : ${reading.humidity.toFixed(0)}% (max ${plant.humidityMax}% pour ${plant.name})`,
-        });
-      }
+    const plant = assignedPlant;
 
-      // Température
-      if (reading.tempAir < plant.tempMin) {
-        const deficit = plant.tempMin - reading.tempAir;
-        problems.push({
-          plantName: plant.name,
-          category: 'temperature',
-          type: deficit > 5 ? 'critical' : 'warning',
-          message: `Température basse : ${reading.tempAir.toFixed(1)}°C (min ${plant.tempMin}°C pour ${plant.name})`,
-        });
-      } else if (reading.tempAir > plant.tempMax) {
-        const excess = reading.tempAir - plant.tempMax;
-        problems.push({
-          plantName: plant.name,
-          category: 'temperature',
-          type: excess > 5 ? 'critical' : 'warning',
-          message: `Température élevée : ${reading.tempAir.toFixed(1)}°C (max ${plant.tempMax}°C pour ${plant.name})`,
-        });
-      }
+    // Humidité
+    if (reading.humidity < plant.humidityMin) {
+      const deficit = plant.humidityMin - reading.humidity;
+      problems.push({
+        plantName: plant.name,
+        category: 'humidity',
+        type: deficit > 15 ? 'critical' : 'warning',
+        message: `Humidité basse : ${reading.humidity.toFixed(0)}% (min ${plant.humidityMin}% pour ${plant.name})`,
+      });
+    } else if (reading.humidity > plant.humidityMax) {
+      problems.push({
+        plantName: plant.name,
+        category: 'humidity',
+        type: 'warning',
+        message: `Humidité élevée : ${reading.humidity.toFixed(0)}% (max ${plant.humidityMax}% pour ${plant.name})`,
+      });
+    }
 
-      // pH
-      if (reading.soilPh < plant.phMin) {
-        problems.push({
-          plantName: plant.name,
-          category: 'ph',
-          type: 'warning',
-          message: `pH sol bas : ${reading.soilPh.toFixed(1)} (min ${plant.phMin} pour ${plant.name})`,
-        });
-      } else if (reading.soilPh > plant.phMax) {
-        problems.push({
-          plantName: plant.name,
-          category: 'ph',
-          type: 'warning',
-          message: `pH sol élevé : ${reading.soilPh.toFixed(1)} (max ${plant.phMax} pour ${plant.name})`,
-        });
-      }
+    // Température
+    if (reading.tempAir < plant.tempMin) {
+      const deficit = plant.tempMin - reading.tempAir;
+      problems.push({
+        plantName: plant.name,
+        category: 'temperature',
+        type: deficit > 5 ? 'critical' : 'warning',
+        message: `Température basse : ${reading.tempAir.toFixed(1)}°C (min ${plant.tempMin}°C pour ${plant.name})`,
+      });
+    } else if (reading.tempAir > plant.tempMax) {
+      const excess = reading.tempAir - plant.tempMax;
+      problems.push({
+        plantName: plant.name,
+        category: 'temperature',
+        type: excess > 5 ? 'critical' : 'warning',
+        message: `Température élevée : ${reading.tempAir.toFixed(1)}°C (max ${plant.tempMax}°C pour ${plant.name})`,
+      });
+    }
 
-      // Lumière
-      if (reading.light < plant.lightMin) {
-        problems.push({
-          plantName: plant.name,
-          category: 'light',
-          type: 'info',
-          message: `Lumière insuffisante : ${reading.light.toFixed(0)}% (min ${plant.lightMin}% pour ${plant.name}). Pensez à activer les LEDs.`,
-        });
-      }
-    });
+    // pH
+    if (reading.soilPh < plant.phMin) {
+      problems.push({
+        plantName: plant.name,
+        category: 'ph',
+        type: 'warning',
+        message: `pH sol bas : ${reading.soilPh.toFixed(1)} (min ${plant.phMin} pour ${plant.name})`,
+      });
+    } else if (reading.soilPh > plant.phMax) {
+      problems.push({
+        plantName: plant.name,
+        category: 'ph',
+        type: 'warning',
+        message: `pH sol élevé : ${reading.soilPh.toFixed(1)} (max ${plant.phMax} pour ${plant.name})`,
+      });
+    }
+
+    // Lumière
+    if (reading.light < plant.lightMin) {
+      problems.push({
+        plantName: plant.name,
+        category: 'light',
+        type: 'info',
+        message: `Lumière insuffisante : ${reading.light.toFixed(0)}% (min ${plant.lightMin}% pour ${plant.name}). Pensez à activer les LEDs.`,
+      });
+    }
 
     // Supprimer les alertes dont le problème n'existe plus (résolu)
     const activeCategories = new Set(problems.map(p => `${p.plantName}::${p.category}`));
@@ -503,12 +569,15 @@ const App: React.FC = () => {
         );
 
         if (existingIdx !== -1) {
-          // Mettre à jour l'alerte existante (message + timestamp + sévérité)
+          // Mettre à jour l'alerte existante — repasse en "non lue" si le message change
+          const prev = updated[existingIdx];
+          const messageChanged = prev.message !== problem.message || prev.type !== problem.type;
           updated[existingIdx] = {
-            ...updated[existingIdx],
+            ...prev,
             message: problem.message,
             type: problem.type,
             timestamp: now,
+            read: messageChanged ? false : prev.read,
           };
         } else {
           // Nouvelle alerte
@@ -521,6 +590,7 @@ const App: React.FC = () => {
             type: problem.type,
             message: problem.message,
             timestamp: now,
+            read: false,
           });
         }
       });
@@ -531,13 +601,14 @@ const App: React.FC = () => {
 
   // --- Simulation Engine (actif uniquement si backend offline) ---
   const generateReading = useCallback((deviceId: string, prev?: SensorReading): SensorReading => {
-    const base = prev || { tempAir: 22, humidity: 55, light: 65, soilPh: 6.8, batteryLevel: 85 } as any;
+    const defaultBase = SIM_BASES[deviceId] || { tempAir: 26, humidity: 52, light: 50, soilPh: 6.2 };
+    const base = prev || { ...defaultBase, batteryLevel: 85 } as any;
     return {
       deviceId,
       timestamp: new Date().toISOString(),
-      tempAir: Math.min(Math.max(base.tempAir + (Math.random() - 0.5) * 0.4, 5), 45),
-      humidity: Math.min(Math.max(base.humidity + (Math.random() - 0.5) * 1.5, 0), 100),
-      light: Math.min(Math.max(base.light + (Math.random() - 0.5) * 4, 0), 100),
+      tempAir: Math.min(Math.max(base.tempAir + (Math.random() - 0.45) * 0.6, 5), 45),
+      humidity: Math.min(Math.max(base.humidity + (Math.random() - 0.55) * 1.2, 0), 100),
+      light: Math.min(Math.max(base.light + (Math.random() - 0.5) * 3, 0), 100),
       soilPh: Math.min(Math.max(base.soilPh + (Math.random() - 0.5) * 0.05, 0), 14),
       batteryLevel: Math.min(Math.max((base.batteryLevel ?? 85) - Math.random() * 0.05, 0), 100),
     };
@@ -551,6 +622,7 @@ const App: React.FC = () => {
     // Générer l'historique initial si vide
     if (Object.keys(history).length === 0) {
       const initialHistory: Record<string, SensorReading[]> = {};
+      const initialEvents: WateringEvent[] = [];
       devices.forEach(dev => {
         let last: SensorReading | undefined;
         const readings: SensorReading[] = [];
@@ -559,8 +631,25 @@ const App: React.FC = () => {
           readings.push(last);
         }
         initialHistory[dev.id] = readings;
+
+        // Générer quelques événements d'arrosage simulés dans les dernières 48h
+        const now = Date.now();
+        [48, 36, 24, 12, 4].forEach((hoursAgo, i) => {
+          initialEvents.push({
+            id: `sim-${dev.id}-${i}`,
+            deviceId: dev.id,
+            timestamp: new Date(now - hoursAgo * 3600 * 1000).toISOString(),
+            mode: i % 2 === 0 ? WateringMode.AUTO : WateringMode.MANUAL,
+            durationSec: [20, 30, 25, 15, 30][i],
+            reason: i % 2 === 0 ? 'Humidité sol basse (auto)' : 'Arrosage manuel',
+          });
+        });
       });
       setHistory(initialHistory);
+      setWateringEvents(prev => {
+        const existingIds = new Set(prev.map(e => e.id));
+        return [...prev, ...initialEvents.filter(e => !existingIds.has(e.id))];
+      });
     }
 
     const interval = setInterval(() => {
@@ -573,16 +662,24 @@ const App: React.FC = () => {
           deviceHistory.push(newReading);
           if (deviceHistory.length > 60) deviceHistory.shift();
           next[dev.id] = deviceHistory;
-
-          // Vérifier les alertes pour CHAQUE device
-          checkAlerts(newReading, dev);
         });
         return next;
       });
     }, 4000);
 
     return () => clearInterval(interval);
-  }, [backendOnline, devices, history, generateReading, checkAlerts]);
+  }, [backendOnline, devices, history, generateReading]);
+
+  // --- Moteur d'alertes : réagit à chaque mise à jour de l'historique ---
+  useEffect(() => {
+    if (!devices.length || !Object.keys(history).length) return;
+    devices.forEach(dev => {
+      const deviceHistory = history[dev.id];
+      if (!deviceHistory?.length) return;
+      const latestReading = deviceHistory[deviceHistory.length - 1];
+      checkAlerts(latestReading, dev);
+    });
+  }, [history, devices, checkAlerts]);
 
   // --- Actions ---
   const handleAuthSuccess = async (email: string, password?: string, firstName?: string, lastName?: string, isRegister?: boolean) => {
@@ -625,6 +722,32 @@ const App: React.FC = () => {
     setPage('landing');
     setView('dashboard');
   };
+
+  // --- Synchronisation station → device sélectionné ---
+  useEffect(() => {
+    if (!selectedStationId) return;
+    const stationDevices = devices.filter(d => d.stationId === selectedStationId);
+    const currentDeviceInStation = stationDevices.find(d => d.id === selectedDeviceId);
+    if (!currentDeviceInStation && stationDevices.length > 0) {
+      setSelectedDeviceId(stationDevices[0].id);
+    }
+  }, [selectedStationId, devices]);
+
+  // Sauvegarder les métadonnées locales dès que stations ou devices changent
+  useEffect(() => {
+    if (!currentUser || !devices.length) return;
+    const meta: LocalMeta = {
+      stations,
+      deviceMeta: Object.fromEntries(
+        devices.map(d => [d.id, {
+          stationId: d.stationId,
+          bacPosition: d.bacPosition,
+          currentPlantProfileId: d.currentPlantProfileId,
+        }])
+      ),
+    };
+    saveLocalMeta(currentUser.id, meta);
+  }, [stations, devices, currentUser]);
 
   const updateProfile = async (updates: Partial<User>) => {
     if (!currentUser) return;
@@ -670,8 +793,37 @@ const App: React.FC = () => {
     setTimeout(() => setStatusMsg(null), 3000);
   };
 
+  const stopWateringCountdown = (deviceId: string) => {
+    if (countdownIntervals.current[deviceId]) {
+      clearInterval(countdownIntervals.current[deviceId]);
+      delete countdownIntervals.current[deviceId];
+    }
+    setWateringCountdown(prev => { const n = { ...prev }; delete n[deviceId]; return n; });
+  };
+
   const triggerWatering = async (deviceId: string, mode: WateringMode, reason: string, durationSec: number = 15) => {
     setDevices(prev => prev.map(d => d.id === deviceId ? { ...d, isWatering: true } : d));
+
+    // Démarrer le décompte
+    setWateringCountdown(prev => ({ ...prev, [deviceId]: durationSec }));
+    const countdownInterval = setInterval(() => {
+      setWateringCountdown(prev => {
+        const remaining = (prev[deviceId] ?? 1) - 1;
+        if (remaining <= 0) {
+          clearInterval(countdownIntervals.current[deviceId]);
+          delete countdownIntervals.current[deviceId];
+          const n = { ...prev }; delete n[deviceId]; return n;
+        }
+        return { ...prev, [deviceId]: remaining };
+      });
+    }, 1000);
+    countdownIntervals.current[deviceId] = countdownInterval;
+
+    const localEvent: WateringEvent = {
+      id: Math.random().toString(36).substr(2, 9),
+      deviceId, timestamp: new Date().toISOString(),
+      mode, durationSec, reason,
+    };
 
     if (backendOnline) {
       try {
@@ -684,19 +836,29 @@ const App: React.FC = () => {
           durationSec: event.duration_sec,
           reason: event.reason || '',
         }, ...prev]);
-      } catch { /* fallback local */ }
+      } catch {
+        // API indisponible → enregistrer localement quand même
+        setWateringEvents(prev => [localEvent, ...prev]);
+      }
     } else {
-      const event: WateringEvent = {
-        id: Math.random().toString(36).substr(2, 9),
-        deviceId, timestamp: new Date().toISOString(),
-        mode, durationSec, reason,
-      };
-      setWateringEvents(prev => [event, ...prev]);
+      setWateringEvents(prev => [localEvent, ...prev]);
     }
 
-    setTimeout(() => {
+    const t = setTimeout(() => {
+      delete wateringTimeouts.current[deviceId];
+      stopWateringCountdown(deviceId);
       setDevices(prev => prev.map(d => d.id === deviceId ? { ...d, isWatering: false, lastWatering: new Date().toISOString() } : d));
     }, durationSec * 1000);
+    wateringTimeouts.current[deviceId] = t;
+  };
+
+  const cancelWatering = (deviceId: string) => {
+    if (wateringTimeouts.current[deviceId]) {
+      clearTimeout(wateringTimeouts.current[deviceId]);
+      delete wateringTimeouts.current[deviceId];
+    }
+    stopWateringCountdown(deviceId);
+    setDevices(prev => prev.map(d => d.id === deviceId ? { ...d, isWatering: false } : d));
   };
 
   // --- Catalog search (debounced) ---
@@ -737,12 +899,41 @@ const App: React.FC = () => {
     setCatalogResults([]);
   };
 
-  const handlePlantSave = (plant: PlantProfile) => {
+  const handlePlantSave = async (plant: PlantProfile) => {
     const isNew = !plantProfiles.find(p => p.id === plant.id);
+    const plantData = {
+      name: plant.name,
+      humidity_min: plant.humidityMin,
+      humidity_max: plant.humidityMax,
+      temp_min: plant.tempMin,
+      temp_max: plant.tempMax,
+      light_min: plant.lightMin,
+      ph_min: plant.phMin,
+      ph_max: plant.phMax,
+      notes: plant.notes || '',
+    };
+
+    if (backendOnline) {
+      try {
+        if (isNew) {
+          const created = await plantService.createPlant(plantData);
+          const newPlant = { ...plant, id: created.id };
+          setPlantProfiles(prev => [...prev, newPlant]);
+          setEditingPlant(null);
+          setView('config');
+        } else {
+          await plantService.updatePlant(plant.id, plantData);
+          setPlantProfiles(prev => prev.map(p => p.id === plant.id ? plant : p));
+          setEditingPlant(null);
+        }
+        return;
+      } catch { /* fallback local */ }
+    }
+    // Mode hors-ligne : mise à jour locale uniquement
     if (isNew) {
       setPlantProfiles(prev => [...prev, plant]);
       setEditingPlant(null);
-      setView('config'); // Redirection vers config pour placer la plante dans un bac
+      setView('config');
     } else {
       setPlantProfiles(prev => prev.map(p => p.id === plant.id ? plant : p));
       setEditingPlant(null);
@@ -807,22 +998,36 @@ const App: React.FC = () => {
     }
   };
 
-  const handleCreateBac = (stationId: string, row: number, col: number) => {
+  const handleCreateBac = async (stationId: string, row: number, col: number) => {
     if (!newBacName.trim()) return;
+    const name = newBacName.trim();
+    setEditingBac(null);
+    setNewBacName('');
+
+    if (backendOnline) {
+      try {
+        const created = await deviceService.createDevice({ name, size: 'Moyen', level: 'Base', location_label: '' });
+        const newBac: Device = {
+          id: created.id, name: created.name, size: 'Moyen', level: 'Base',
+          locationLabel: '', stationId, bacPosition: { row, col },
+          isLightOn: false, isFanOn: false, createdAt: created.created_at,
+          isWatering: false, automationEnabled: false,
+          config: { autoVentilation: false, autoLighting: false, samplingFrequencySec: 30, phCalibrationOffset: 0 },
+        };
+        setDevices(prev => [...prev, newBac]);
+        return;
+      } catch { /* fallback local */ }
+    }
+    // Mode hors-ligne
     const newBac: Device = {
       id: Math.random().toString(36).substr(2, 9),
-      name: newBacName.trim(),
-      size: 'Moyen', level: 'Base',
-      locationLabel: '',
+      name, size: 'Moyen', level: 'Base', locationLabel: '',
       stationId, bacPosition: { row, col },
-      isLightOn: false, isFanOn: false,
-      createdAt: new Date().toISOString(),
+      isLightOn: false, isFanOn: false, createdAt: new Date().toISOString(),
       isWatering: false, automationEnabled: false,
       config: { autoVentilation: false, autoLighting: false, samplingFrequencySec: 30, phCalibrationOffset: 0 },
     };
     setDevices(prev => [...prev, newBac]);
-    setEditingBac(null);
-    setNewBacName('');
   };
 
   const handleDeleteBac = (bacId: string) => {
@@ -846,7 +1051,7 @@ const App: React.FC = () => {
       {/* Botanical Sidebar */}
       <aside className={`w-24 lg:w-72 border-r flex flex-col fixed inset-y-0 z-50 transition-colors ${sidebarClasses}`}>
         <div onClick={() => setView('dashboard')} className="p-8 flex items-center gap-4 cursor-pointer group">
-          <div className="w-12 h-12 bg-emerald-600 rounded-2xl flex items-center justify-center text-white shadow-lg shadow-emerald-200 group-hover:scale-105 transition-transform">
+          <div className="w-12 h-12 bg-violet-600 rounded-2xl flex items-center justify-center text-white shadow-lg shadow-violet-200 group-hover:scale-105 transition-transform">
             <i className="fas fa-leaf text-2xl"></i>
           </div>
           <span className={`text-2xl font-black hidden lg:block tracking-tighter transition-colors ${isDarkMode ? 'text-slate-100' : 'text-slate-800'}`}>SECOMO</span>
@@ -856,7 +1061,7 @@ const App: React.FC = () => {
           {[
             { id: 'dashboard', icon: 'fa-chart-pie', label: 'Dashboard' },
             { id: 'plantes', icon: 'fa-seedling', label: 'Mes Plantes' },
-            { id: 'alerts', icon: 'fa-bell', label: 'Alertes', badge: alerts.length },
+            { id: 'alerts', icon: 'fa-bell', label: 'Alertes', badge: alerts.filter(a => !a.read).length },
             { id: 'activities', icon: 'fa-history', label: 'Activités' },
             { id: 'config', icon: 'fa-sliders', label: 'Configuration' },
             { id: 'profil', icon: 'fa-user-gear', label: 'Mon Profil' },
@@ -864,7 +1069,7 @@ const App: React.FC = () => {
             <button 
               key={item.id}
               onClick={() => setView(item.id as any)}
-              className={`w-full flex items-center gap-4 p-4 rounded-2xl transition-all relative ${view === item.id ? 'bg-emerald-600/10 text-emerald-500 font-bold' : 'text-slate-400 hover:bg-emerald-600/5'}`}
+              className={`w-full flex items-center gap-4 p-4 rounded-2xl transition-all relative ${view === item.id ? 'bg-violet-600/10 text-violet-500 font-bold' : 'text-slate-400 hover:bg-violet-600/5'}`}
             >
               <i className={`fas ${item.icon} w-6 text-center text-xl`}></i>
               <span className="hidden lg:block">{item.label}</span>
@@ -877,7 +1082,7 @@ const App: React.FC = () => {
 
         <div className={`p-6 border-t ${isDarkMode ? 'border-slate-800' : 'border-slate-100'}`}>
           <div onClick={() => setView('profil')} className={`flex items-center gap-4 p-4 rounded-2xl cursor-pointer transition-colors ${isDarkMode ? 'hover:bg-slate-800' : 'hover:bg-slate-50'} mb-4`}>
-            <div className="w-10 h-10 bg-emerald-100 rounded-full flex items-center justify-center text-emerald-600 font-bold">
+            <div className="w-10 h-10 bg-violet-100 rounded-full flex items-center justify-center text-violet-600 font-bold">
               {currentUser.firstName[0]}{currentUser.lastName[0]}
             </div>
             <div className="hidden lg:block truncate">
@@ -894,39 +1099,73 @@ const App: React.FC = () => {
 
       {/* Main Panel */}
       <main className="flex-1 ml-24 lg:ml-72 overflow-y-auto">
-        <header className={`sticky top-0 z-40 backdrop-blur-xl border-b px-8 py-6 flex justify-between items-center transition-colors ${headerClasses}`}>
-          <div>
+        <header className={`sticky top-0 z-40 backdrop-blur-xl border-b px-8 py-4 flex items-center justify-between gap-6 transition-colors ${headerClasses}`}>
+          {/* Gauche : titre + station */}
+          <div className="flex-shrink-0">
             <h2 className={`text-3xl font-black capitalize tracking-tight ${isDarkMode ? 'text-slate-100' : 'text-slate-800'}`}>{view === 'profil' ? 'Mon Profil' : view}</h2>
-            <p className="text-slate-400 text-sm font-medium">Station: <span className="text-emerald-500">{selectedDevice?.name}</span></p>
+            <p className="text-slate-400 text-sm font-medium">
+              Station: <span className="text-violet-500">{stations.find(s => s.id === selectedStationId)?.name || '—'}</span>
+            </p>
           </div>
-          
-          <div className="flex items-center gap-4">
-            {view !== 'profil' && (
-              <select
-                value={selectedDeviceId || ''}
-                onChange={(e) => setSelectedDeviceId(e.target.value)}
-                className={`${inputClasses} border-none rounded-2xl px-6 py-3 text-sm font-bold focus:ring-2 focus:ring-emerald-500 outline-none cursor-pointer`}
+
+          {/* Centre : toggle AUTO/MANUEL + note (dashboard uniquement) */}
+          {view === 'dashboard' && selectedDevice && (
+            <div className="flex flex-col items-center gap-1.5 flex-shrink-0">
+              <div
+                onClick={() => setDevices(prev => prev.map(d => d.id === selectedDevice.id ? {
+                  ...d,
+                  automationEnabled: !d.automationEnabled,
+                  // Passage en AUTO : éteindre ventilateur et lumière (arrosage en cours se termine)
+                  ...(!d.automationEnabled ? { isFanOn: false, isLightOn: false } : {}),
+                } : d))}
+                className={`relative cursor-pointer rounded-2xl p-0.5 transition-all duration-300 shadow-md select-none w-44 ${
+                  selectedDevice.automationEnabled
+                    ? 'bg-violet-500 shadow-violet-500/30'
+                    : (isDarkMode ? 'bg-slate-700' : 'bg-slate-200')
+                }`}
               >
-                {stations.map(station => {
-                  const stationBacs = devices.filter(d => d.stationId === station.id);
-                  if (stationBacs.length === 0) return null;
-                  return (
-                    <optgroup key={station.id} label={`${station.name} (${station.locationLabel || 'Sans emplacement'})`}>
-                      {stationBacs.map(d => (
-                        <option key={d.id} value={d.id}>
-                          {d.name}{d.physicalId ? ' ⚡' : ''}
-                        </option>
-                      ))}
-                    </optgroup>
-                  );
-                })}
-                {devices.filter(d => !d.stationId).map(d => (
-                  <option key={d.id} value={d.id}>{d.name}</option>
+                <div className={`absolute top-0.5 bottom-0.5 w-[calc(50%-3px)] rounded-xl bg-white shadow-sm transition-all duration-300 ${
+                  selectedDevice.automationEnabled ? 'left-[calc(50%+2px)]' : 'left-0.5'
+                }`}></div>
+                <div className="relative grid grid-cols-2 text-center">
+                  <div className={`py-2 px-3 flex items-center justify-center gap-1.5 transition-colors duration-300 ${
+                    !selectedDevice.automationEnabled ? 'text-slate-700 font-black' : 'text-white/60 font-bold'
+                  }`}>
+                    <i className="fas fa-hand-pointer text-xs"></i>
+                    <span className="text-xs uppercase tracking-wide">Manuel</span>
+                  </div>
+                  <div className={`py-2 px-3 flex items-center justify-center gap-1.5 transition-colors duration-300 ${
+                    selectedDevice.automationEnabled ? 'text-violet-700 font-black' : 'text-white/50 font-bold'
+                  }`}>
+                    <i className="fas fa-robot text-xs"></i>
+                    <span className="text-xs uppercase tracking-wide">Auto</span>
+                  </div>
+                </div>
+              </div>
+              <p className={`text-[10px] text-center leading-tight ${isDarkMode ? 'text-slate-500' : 'text-slate-400'}`}>
+                <i className="fas fa-circle-info mr-1"></i>
+                Paramétrez l'automatisation bac par bac dans <span className={`font-bold ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>Configuration <i className="fas fa-gear text-[9px]"></i></span>
+              </p>
+            </div>
+          )}
+
+          {/* Droite : sélecteur station + statut profil */}
+          <div className="flex items-center gap-4 flex-shrink-0">
+            {view !== 'profil' && stations.length > 0 && (
+              <select
+                value={selectedStationId || ''}
+                onChange={(e) => setSelectedStationId(e.target.value)}
+                className={`${inputClasses} border-none rounded-2xl px-6 py-3 text-sm font-bold focus:ring-2 focus:ring-violet-500 outline-none cursor-pointer`}
+              >
+                {stations.map(station => (
+                  <option key={station.id} value={station.id}>
+                    {station.name}{station.locationLabel ? ` — ${station.locationLabel}` : ''}
+                  </option>
                 ))}
               </select>
             )}
             {view === 'profil' && statusMsg && (
-              <span className={`px-4 py-2 rounded-xl text-xs font-bold animate-fade-in ${statusMsg.type === 'success' ? 'bg-emerald-500/10 text-emerald-500' : 'bg-rose-500/10 text-rose-500'}`}>
+              <span className={`px-4 py-2 rounded-xl text-xs font-bold animate-fade-in ${statusMsg.type === 'success' ? 'bg-violet-500/10 text-violet-500' : 'bg-rose-500/10 text-rose-500'}`}>
                 {statusMsg.text}
               </span>
             )}
@@ -938,6 +1177,31 @@ const App: React.FC = () => {
           {view === 'dashboard' && selectedDevice && (
             <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
               <div className="lg:col-span-3 space-y-8">
+                {/* Sélecteur de bac dans la station */}
+                {(() => {
+                  const stationBacs = devices.filter(d => d.stationId === selectedStationId);
+                  if (stationBacs.length <= 1) return null;
+                  return (
+                    <div className="flex items-center gap-3 flex-wrap">
+                      <span className={`text-xs font-black uppercase tracking-wider ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>
+                        <i className="fas fa-box mr-2"></i>Bac :
+                      </span>
+                      {stationBacs.map(bac => (
+                        <button
+                          key={bac.id}
+                          onClick={() => setSelectedDeviceId(bac.id)}
+                          className={`px-4 py-2 rounded-xl text-xs font-bold transition-all ${
+                            selectedDeviceId === bac.id
+                              ? 'bg-violet-600 text-white shadow-lg shadow-violet-600/20'
+                              : (isDarkMode ? 'bg-slate-800 text-slate-400 hover:bg-slate-700' : 'bg-slate-100 text-slate-500 hover:bg-slate-200')
+                          }`}
+                        >
+                          {bac.name}{bac.physicalId ? ' ⚡' : ''}
+                        </button>
+                      ))}
+                    </div>
+                  );
+                })()}
                 {/* Cartes capteurs — placeholder si pas encore de données */}
                 {currentReading ? (
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -955,14 +1219,121 @@ const App: React.FC = () => {
                   </div>
                 )}
                 <HistoryChart data={history[selectedDevice.id] || []} isDark={isDarkMode} />
+
+                {/* Contrôles Manuels — ligne horizontale sous l'historique, visible seulement en mode MANUEL */}
+                {!selectedDevice.automationEnabled && (
+                  <div className={`${cardClasses} rounded-[32px] border shadow-sm overflow-hidden`}>
+                    <div className="px-8 py-5 border-b flex items-center gap-2 ${isDarkMode ? 'border-slate-800' : 'border-slate-100'}">
+                      <i className="fas fa-hand-pointer text-slate-400"></i>
+                      <h3 className={`text-base font-black ${isDarkMode ? 'text-slate-100' : 'text-slate-800'}`}>Contrôles Manuels</h3>
+                    </div>
+                    <div className="px-8 py-6">
+                      <div className="grid grid-cols-3 gap-6">
+
+                        {/* 1. Arroser */}
+                        <div className="space-y-3">
+                          <p className={`text-xs font-black uppercase tracking-widest flex items-center gap-2 ${isDarkMode ? 'text-blue-400' : 'text-blue-600'}`}>
+                            <i className="fas fa-faucet-drip"></i> Arroser
+                          </p>
+                          {selectedDevice.isWatering ? (
+                            <div className={`flex items-center gap-2 px-3 py-2 rounded-xl ${isDarkMode ? 'bg-blue-900/30' : 'bg-blue-50'}`}>
+                              <i className="fas fa-droplet text-blue-400 animate-bounce text-sm"></i>
+                              <span className={`text-sm font-bold ${isDarkMode ? 'text-blue-300' : 'text-blue-600'}`}>
+                                En cours ({wateringCountdown[selectedDevice.id] ?? 0} sec)
+                              </span>
+                            </div>
+                          ) : (
+                            <div className="flex items-center gap-2">
+                              <input
+                                type="number" min={5} max={120} step={5}
+                                value={manualDuration}
+                                onChange={e => setManualDuration(Math.min(120, Math.max(5, +e.target.value)))}
+                                className={`w-20 text-center rounded-xl py-2 font-black text-sm outline-none focus:ring-2 focus:ring-blue-500 ${isDarkMode ? 'bg-slate-800 text-slate-100' : 'bg-slate-100 text-slate-800'}`}
+                              />
+                              <span className="text-xs text-slate-400">secondes</span>
+                            </div>
+                          )}
+                          <button
+                            onClick={() => selectedDevice.isWatering ? cancelWatering(selectedDevice.id) : triggerWatering(selectedDevice.id, WateringMode.MANUAL, `Arrosage manuel ${manualDuration}s`, manualDuration)}
+                            className={`w-full py-3 rounded-2xl font-black text-sm uppercase tracking-wide transition-all active:scale-95 flex items-center justify-center gap-2 ${
+                              selectedDevice.isWatering
+                                ? 'bg-rose-500 hover:bg-rose-600 text-white shadow-lg shadow-rose-500/20'
+                                : 'bg-blue-600 hover:bg-blue-700 text-white shadow-lg shadow-blue-600/20'
+                            }`}
+                          >
+                            <i className={`fas ${selectedDevice.isWatering ? 'fa-stop' : 'fa-faucet-drip'}`}></i>
+                            {selectedDevice.isWatering ? 'Arrêter arrosage' : `Arroser ${manualDuration}s`}
+                          </button>
+                          {selectedDevice.lastWatering && (
+                            <p className="text-[10px] text-slate-400">
+                              <i className="fas fa-clock mr-1"></i>Dernier : {new Date(selectedDevice.lastWatering).toLocaleString()}
+                            </p>
+                          )}
+                        </div>
+
+                        {/* 2. Ventilation */}
+                        <div className="space-y-3">
+                          <p className={`text-xs font-black uppercase tracking-widest flex items-center gap-2 ${isDarkMode ? 'text-amber-400' : 'text-amber-600'}`}>
+                            <i className="fas fa-wind"></i> Ventilation
+                          </p>
+                          <div className="flex items-center gap-2">
+                            <input
+                              type="number" min={10} max={40} step={1}
+                              value={manualTargetTemp}
+                              onChange={e => setManualTargetTemp(Math.min(40, Math.max(10, +e.target.value)))}
+                              className={`w-20 text-center rounded-xl py-2 font-black text-sm outline-none focus:ring-2 focus:ring-amber-500 ${isDarkMode ? 'bg-slate-800 text-slate-100' : 'bg-slate-100 text-slate-800'}`}
+                            />
+                            <span className="text-xs text-slate-400">°C cible</span>
+                          </div>
+                          <button
+                            onClick={() => handleToggleFan(selectedDevice.id)}
+                            className={`w-full py-3 rounded-2xl font-black text-sm uppercase tracking-wide transition-all active:scale-95 flex items-center justify-center gap-2 ${
+                              selectedDevice.isFanOn
+                                ? 'bg-amber-500 hover:bg-amber-600 text-white shadow-lg shadow-amber-500/20'
+                                : (isDarkMode ? 'bg-slate-800 hover:bg-amber-500/20 text-slate-300 hover:text-amber-400' : 'bg-slate-100 hover:bg-amber-50 text-slate-600 hover:text-amber-600')
+                            }`}
+                          >
+                            <i className={`fas fa-wind ${selectedDevice.isFanOn ? 'animate-spin' : ''}`} style={selectedDevice.isFanOn ? { animationDuration: '1.5s' } : {}}></i>
+                            {selectedDevice.isFanOn ? `Ventilateur ON — ${manualTargetTemp}°C` : 'Ventilateur OFF'}
+                          </button>
+                        </div>
+
+                        {/* 3. Lumière */}
+                        <div className="space-y-3">
+                          <p className={`text-xs font-black uppercase tracking-widest flex items-center gap-2 ${isDarkMode ? 'text-yellow-400' : 'text-yellow-600'}`}>
+                            <i className="fas fa-lightbulb"></i> Éclairage LED
+                          </p>
+                          <div className={`flex items-center gap-3 px-4 py-2 rounded-xl ${isDarkMode ? 'bg-slate-800' : 'bg-slate-100'}`}>
+                            <i className={`fas fa-lightbulb text-xl ${selectedDevice.isLightOn ? 'text-yellow-400' : (isDarkMode ? 'text-slate-600' : 'text-slate-300')}`}></i>
+                            <span className={`text-sm font-bold ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>{selectedDevice.isLightOn ? 'Allumée' : 'Éteinte'}</span>
+                          </div>
+                          <button
+                            onClick={() => handleToggleLight(selectedDevice.id)}
+                            className={`w-full py-3 rounded-2xl font-black text-sm uppercase tracking-wide transition-all active:scale-95 flex items-center justify-center gap-2 ${
+                              selectedDevice.isLightOn
+                                ? 'bg-yellow-400 hover:bg-yellow-500 text-yellow-950 shadow-lg shadow-yellow-400/30'
+                                : (isDarkMode ? 'bg-slate-800 hover:bg-yellow-400/10 text-slate-400 hover:text-yellow-400' : 'bg-slate-100 hover:bg-yellow-50 text-slate-500 hover:text-yellow-600')
+                            }`}
+                          >
+                            <i className="fas fa-lightbulb"></i>
+                            {selectedDevice.isLightOn ? 'Éteindre' : 'Allumer'}
+                          </button>
+                        </div>
+
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
+
+              {/* Colonne droite */}
               <div className="space-y-8">
                 <WeatherWidget isDark={isDarkMode} />
                 <div className={`${cardClasses} p-8 rounded-[32px] border shadow-sm`}>
                   <h3 className={`text-lg font-black mb-6 ${isDarkMode ? 'text-slate-100' : 'text-slate-800'}`}>Plante Cultivée</h3>
                   {currentPlant ? (
                     <div className="flex items-center gap-4 mb-6">
-                      <div className="w-16 h-16 bg-emerald-500/10 rounded-2xl flex items-center justify-center text-emerald-500 shadow-inner">
+                      <div className="w-16 h-16 bg-violet-500/10 rounded-2xl flex items-center justify-center text-violet-500 shadow-inner">
                         <i className="fas fa-seedling text-3xl"></i>
                       </div>
                       <div>
@@ -978,129 +1349,15 @@ const App: React.FC = () => {
                       <p className="text-sm text-slate-400">Aucune plante assignée à ce bac.</p>
                     </div>
                   )}
-                  <button onClick={() => setView('plantes')} className="w-full p-4 border-2 border-emerald-500/20 hover:border-emerald-500 hover:text-emerald-500 rounded-2xl text-xs font-black uppercase tracking-widest transition-all">
+                  <button onClick={() => setView('plantes')} className="w-full p-4 border-2 border-violet-500/20 hover:border-violet-500 hover:text-violet-500 rounded-2xl text-xs font-black uppercase tracking-widest transition-all">
                     {currentPlant ? 'Changer de Profil' : 'Assigner une plante'}
                   </button>
                 </div>
 
-                {/* Mode AUTO toggle (compact) */}
-                <div className={`${cardClasses} p-5 rounded-[24px] border shadow-sm flex items-center justify-between`}>
-                  <div className="flex items-center gap-3">
-                    <i className={`fas fa-robot text-xl ${selectedDevice.automationEnabled ? 'text-emerald-500' : 'text-slate-400'}`}></i>
-                    <div>
-                      <p className={`text-sm font-bold ${isDarkMode ? 'text-slate-200' : 'text-slate-700'}`}>Mode {selectedDevice.automationEnabled ? 'AUTO' : 'MANUEL'}</p>
-                      <p className="text-[10px] text-slate-400">{selectedDevice.automationEnabled ? 'Régulation automatique active' : 'Contrôle manuel'}</p>
-                    </div>
-                  </div>
-                  <button
-                    onClick={() => setDevices(prev => prev.map(d => d.id === selectedDevice.id ? { ...d, automationEnabled: !d.automationEnabled } : d))}
-                    className={`relative w-14 h-8 rounded-full transition-colors duration-300 ${selectedDevice.automationEnabled ? 'bg-emerald-500' : (isDarkMode ? 'bg-slate-700' : 'bg-slate-300')}`}
-                  >
-                    <div className={`absolute top-1 w-6 h-6 bg-white rounded-full shadow-md transition-transform duration-300 ${selectedDevice.automationEnabled ? 'translate-x-7' : 'translate-x-1'}`}></div>
-                  </button>
-                </div>
-
-                {/* Panneau Mode Manuel : masqué si AUTO actif */}
-                <div className={`${cardClasses} rounded-[32px] border shadow-sm overflow-hidden`}>
-                  <button
-                    onClick={() => { if (selectedDevice.automationEnabled) setDevices(prev => prev.map(d => d.id === selectedDevice.id ? { ...d, automationEnabled: false } : d)); }}
-                    className={`w-full p-6 flex items-center justify-between transition-colors ${selectedDevice.automationEnabled ? (isDarkMode ? 'bg-emerald-600/10' : 'bg-emerald-50') : ''}`}
-                  >
-                    <h3 className={`text-lg font-black flex items-center gap-2 ${isDarkMode ? 'text-slate-100' : 'text-slate-800'}`}>
-                      <i className={`fas fa-hand-pointer ${selectedDevice.automationEnabled ? 'text-slate-400' : 'text-slate-500'}`}></i>
-                      Contrôles Manuels
-                    </h3>
-                    {selectedDevice.automationEnabled && (
-                      <span className="text-xs font-bold text-emerald-500 flex items-center gap-2">
-                        <i className="fas fa-lock"></i> Mode AUTO actif — cliquer pour passer en manuel
-                      </span>
-                    )}
-                  </button>
-
-                  {!selectedDevice.automationEnabled && (
-                  <div className="px-8 pb-8 space-y-7">
-
-                  {/* 1. Arroser la plante */}
-                  <div className="space-y-3">
-                    <p className={`text-xs font-black uppercase tracking-widest flex items-center gap-2 ${isDarkMode ? 'text-blue-400' : 'text-blue-600'}`}>
-                      <i className="fas fa-faucet-drip"></i> Arroser la plante
-                    </p>
-                    <SwipeSlider
-                      value={manualDuration} min={5} max={120} step={5}
-                      onChange={setManualDuration} unit="s" label="Durée"
-                      color="text-blue-500" isDark={isDarkMode}
-                    />
-                    <button
-                      onClick={() => !selectedDevice.isWatering && triggerWatering(selectedDevice.id, WateringMode.MANUAL, `Arrosage manuel ${manualDuration}s`, manualDuration)}
-                      disabled={selectedDevice.isWatering}
-                      className={`w-full py-4 rounded-2xl font-black uppercase tracking-widest transition-all active:scale-95 flex items-center justify-center gap-3 ${
-                        selectedDevice.isWatering
-                          ? (isDarkMode ? 'bg-slate-800 text-slate-600 cursor-not-allowed' : 'bg-slate-100 text-slate-400 cursor-not-allowed')
-                          : 'bg-blue-600 hover:bg-blue-700 text-white shadow-lg shadow-blue-600/20'
-                      }`}
-                    >
-                      <i className={`fas ${selectedDevice.isWatering ? 'fa-spinner fa-spin' : 'fa-faucet-drip'}`}></i>
-                      {selectedDevice.isWatering ? 'En cours...' : `Arroser ${manualDuration}s`}
-                    </button>
-                    {selectedDevice.lastWatering && (
-                      <p className={`text-[10px] ${isDarkMode ? 'text-slate-500' : 'text-slate-400'}`}>
-                        <i className="fas fa-clock mr-1"></i>Dernier : {new Date(selectedDevice.lastWatering).toLocaleString()}
-                      </p>
-                    )}
-                  </div>
-
-                  <div className={`border-t ${isDarkMode ? 'border-slate-800' : 'border-slate-100'}`}></div>
-
-                  {/* 2. Ventilation / Température */}
-                  <div className="space-y-3">
-                    <p className={`text-xs font-black uppercase tracking-widest flex items-center gap-2 ${isDarkMode ? 'text-amber-400' : 'text-amber-600'}`}>
-                      <i className="fas fa-wind"></i> Ajuster la température
-                    </p>
-                    <SwipeSlider
-                      value={manualTargetTemp} min={10} max={40} step={1}
-                      onChange={setManualTargetTemp} unit="°C" label="Température cible"
-                      color="text-amber-500" isDark={isDarkMode}
-                    />
-                    <button
-                      onClick={() => handleToggleFan(selectedDevice.id)}
-                      className={`w-full py-4 rounded-2xl font-black uppercase tracking-widest transition-all active:scale-95 flex items-center justify-center gap-3 ${
-                        selectedDevice.isFanOn
-                          ? 'bg-amber-500 hover:bg-amber-600 text-white shadow-lg shadow-amber-500/20'
-                          : (isDarkMode ? 'bg-slate-800 hover:bg-amber-500/20 text-slate-300 hover:text-amber-400' : 'bg-slate-100 hover:bg-amber-50 text-slate-600 hover:text-amber-600')
-                      }`}
-                    >
-                      <i className={`fas fa-wind ${selectedDevice.isFanOn ? 'animate-spin' : ''}`} style={selectedDevice.isFanOn ? { animationDuration: '1.5s' } : {}}></i>
-                      {selectedDevice.isFanOn ? `Ventilateur ON → ${manualTargetTemp}°C` : 'Ventilateur OFF'}
-                    </button>
-                  </div>
-
-                  <div className={`border-t ${isDarkMode ? 'border-slate-800' : 'border-slate-100'}`}></div>
-
-                  {/* 3. Lumière */}
-                  <div className="space-y-3">
-                    <p className={`text-xs font-black uppercase tracking-widest flex items-center gap-2 ${isDarkMode ? 'text-yellow-400' : 'text-yellow-600'}`}>
-                      <i className="fas fa-lightbulb"></i> Éclairage LED
-                    </p>
-                    <button
-                      onClick={() => handleToggleLight(selectedDevice.id)}
-                      className={`w-full py-5 rounded-2xl font-black uppercase tracking-widest transition-all active:scale-95 flex items-center justify-center gap-3 text-lg ${
-                        selectedDevice.isLightOn
-                          ? 'bg-yellow-400 hover:bg-yellow-500 text-yellow-950 shadow-lg shadow-yellow-400/30'
-                          : (isDarkMode ? 'bg-slate-800 hover:bg-yellow-400/10 text-slate-400 hover:text-yellow-400' : 'bg-slate-100 hover:bg-yellow-50 text-slate-500 hover:text-yellow-600')
-                      }`}
-                    >
-                      <i className={`fas fa-lightbulb ${selectedDevice.isLightOn ? 'text-yellow-700' : ''}`}></i>
-                      {selectedDevice.isLightOn ? 'Lumière allumée' : 'Lumière éteinte'}
-                    </button>
-                  </div>
-                  </div>
-                  )}
-                </div>
-
                 {/* Recommandations */}
                 {recommendations.length > 0 && (
-                  <div className={`${cardClasses} p-8 rounded-[32px] border shadow-sm space-y-4`}>
-                    <h3 className={`text-lg font-black ${isDarkMode ? 'text-slate-100' : 'text-slate-800'}`}>Recommandations</h3>
+                  <div className={`${cardClasses} p-6 rounded-[32px] border shadow-sm space-y-3`}>
+                    <h3 className={`text-base font-black ${isDarkMode ? 'text-slate-100' : 'text-slate-800'}`}>Recommandations</h3>
                     {recommendations.map(rec => (
                       <div key={rec.id} className={`p-4 rounded-2xl flex items-start gap-3 ${
                         rec.severity === 'critical' ? (isDarkMode ? 'bg-rose-500/10' : 'bg-rose-50')
@@ -1111,11 +1368,22 @@ const App: React.FC = () => {
                           rec.severity === 'critical' ? 'fa-circle-exclamation text-rose-500'
                           : rec.severity === 'warning' ? 'fa-triangle-exclamation text-amber-500'
                           : 'fa-circle-info text-blue-400'
-                        } mt-0.5`}></i>
+                        } mt-0.5 flex-shrink-0`}></i>
                         <p className={`text-sm font-medium ${isDarkMode ? 'text-slate-200' : 'text-slate-700'}`}>{rec.text}</p>
                       </div>
                     ))}
                   </div>
+                )}
+
+                {/* Message Mode AUTO actif (si applicable) */}
+                {selectedDevice.automationEnabled && (
+                  <button
+                    onClick={() => setDevices(prev => prev.map(d => d.id === selectedDevice.id ? { ...d, automationEnabled: false } : d))}
+                    className={`w-full px-5 py-3.5 rounded-2xl border flex items-center justify-center gap-2 transition-colors ${isDarkMode ? 'bg-violet-500/10 border-violet-500/30 hover:bg-violet-500/20' : 'bg-violet-50 border-violet-200 hover:bg-violet-100'}`}
+                  >
+                    <i className="fas fa-lock text-violet-500 text-xs"></i>
+                    <span className="text-xs font-bold text-violet-600">Mode AUTO actif — cliquer pour passer en manuel</span>
+                  </button>
                 )}
               </div>
             </div>
@@ -1127,7 +1395,7 @@ const App: React.FC = () => {
               <div className="lg:col-span-2 space-y-8">
                 <section className={`${cardClasses} p-10 rounded-[40px] border shadow-sm space-y-8`}>
                   <div className="flex items-center gap-4">
-                     <div className="w-16 h-16 bg-emerald-600 rounded-[20px] flex items-center justify-center text-white text-3xl font-black shadow-xl shadow-emerald-600/20">
+                     <div className="w-16 h-16 bg-violet-600 rounded-[20px] flex items-center justify-center text-white text-3xl font-black shadow-xl shadow-violet-600/20">
                        {currentUser.firstName[0]}
                      </div>
                      <div>
@@ -1143,7 +1411,7 @@ const App: React.FC = () => {
                         type="text" 
                         value={profileForm.firstName} 
                         onChange={e => setProfileForm({...profileForm, firstName: e.target.value})}
-                        className={`w-full ${inputClasses} rounded-2xl p-4 font-bold outline-none focus:ring-2 focus:ring-emerald-500 transition-all`} 
+                        className={`w-full ${inputClasses} rounded-2xl p-4 font-bold outline-none focus:ring-2 focus:ring-violet-500 transition-all`} 
                       />
                     </div>
                     <div className="space-y-2">
@@ -1152,7 +1420,7 @@ const App: React.FC = () => {
                         type="text" 
                         value={profileForm.lastName} 
                         onChange={e => setProfileForm({...profileForm, lastName: e.target.value})}
-                        className={`w-full ${inputClasses} rounded-2xl p-4 font-bold outline-none focus:ring-2 focus:ring-emerald-500 transition-all`} 
+                        className={`w-full ${inputClasses} rounded-2xl p-4 font-bold outline-none focus:ring-2 focus:ring-violet-500 transition-all`} 
                       />
                     </div>
                     <div className="space-y-2 lg:col-span-2">
@@ -1168,7 +1436,7 @@ const App: React.FC = () => {
                   <div className="flex justify-end pt-4">
                     <button 
                       onClick={() => updateProfile({ firstName: profileForm.firstName, lastName: profileForm.lastName })}
-                      className="bg-emerald-600 hover:bg-emerald-700 text-white px-8 py-4 rounded-2xl font-black uppercase tracking-widest transition-all shadow-lg shadow-emerald-600/20 active:scale-95"
+                      className="bg-violet-600 hover:bg-violet-700 text-white px-8 py-4 rounded-2xl font-black uppercase tracking-widest transition-all shadow-lg shadow-violet-600/20 active:scale-95"
                     >
                       Enregistrer les modifications
                     </button>
@@ -1185,7 +1453,7 @@ const App: React.FC = () => {
                         value={passwordForm.current}
                         onChange={e => setPasswordForm({...passwordForm, current: e.target.value})}
                         placeholder="••••••••"
-                        className={`w-full ${inputClasses} rounded-2xl p-4 font-bold outline-none focus:ring-2 focus:ring-emerald-500 transition-all`} 
+                        className={`w-full ${inputClasses} rounded-2xl p-4 font-bold outline-none focus:ring-2 focus:ring-violet-500 transition-all`} 
                       />
                     </div>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -1196,7 +1464,7 @@ const App: React.FC = () => {
                           value={passwordForm.next}
                           onChange={e => setPasswordForm({...passwordForm, next: e.target.value})}
                           placeholder="••••••••"
-                          className={`w-full ${inputClasses} rounded-2xl p-4 font-bold outline-none focus:ring-2 focus:ring-emerald-500 transition-all`} 
+                          className={`w-full ${inputClasses} rounded-2xl p-4 font-bold outline-none focus:ring-2 focus:ring-violet-500 transition-all`} 
                         />
                       </div>
                       <div className="space-y-2">
@@ -1206,7 +1474,7 @@ const App: React.FC = () => {
                           value={passwordForm.confirm}
                           onChange={e => setPasswordForm({...passwordForm, confirm: e.target.value})}
                           placeholder="••••••••"
-                          className={`w-full ${inputClasses} rounded-2xl p-4 font-bold outline-none focus:ring-2 focus:ring-emerald-500 transition-all`} 
+                          className={`w-full ${inputClasses} rounded-2xl p-4 font-bold outline-none focus:ring-2 focus:ring-violet-500 transition-all`} 
                         />
                       </div>
                     </div>
@@ -1229,23 +1497,23 @@ const App: React.FC = () => {
                   <div className="space-y-4">
                     <button 
                       onClick={() => updateProfile({ theme: 'light' })}
-                      className={`w-full p-4 rounded-2xl flex items-center justify-between border-2 transition-all ${currentUser.theme === 'light' ? 'border-emerald-500 bg-emerald-500/10' : 'border-transparent bg-slate-100/50'}`}
+                      className={`w-full p-4 rounded-2xl flex items-center justify-between border-2 transition-all ${currentUser.theme === 'light' ? 'border-violet-500 bg-violet-500/10' : 'border-transparent bg-slate-100/50'}`}
                     >
                       <div className="flex items-center gap-4">
-                        <i className={`fas fa-sun ${currentUser.theme === 'light' ? 'text-emerald-500' : 'text-slate-400'}`}></i>
-                        <span className={`font-bold ${currentUser.theme === 'light' ? 'text-emerald-600' : 'text-slate-500'}`}>Tech Calme (Clair)</span>
+                        <i className={`fas fa-sun ${currentUser.theme === 'light' ? 'text-violet-500' : 'text-slate-400'}`}></i>
+                        <span className={`font-bold ${currentUser.theme === 'light' ? 'text-violet-600' : 'text-slate-500'}`}>Tech Calme (Clair)</span>
                       </div>
-                      {currentUser.theme === 'light' && <i className="fas fa-check-circle text-emerald-500"></i>}
+                      {currentUser.theme === 'light' && <i className="fas fa-check-circle text-violet-500"></i>}
                     </button>
                     <button 
                       onClick={() => updateProfile({ theme: 'dark' })}
-                      className={`w-full p-4 rounded-2xl flex items-center justify-between border-2 transition-all ${currentUser.theme === 'dark' ? 'border-emerald-500 bg-emerald-500/10' : 'border-transparent bg-slate-800/50'}`}
+                      className={`w-full p-4 rounded-2xl flex items-center justify-between border-2 transition-all ${currentUser.theme === 'dark' ? 'border-violet-500 bg-violet-500/10' : 'border-transparent bg-slate-800/50'}`}
                     >
                       <div className="flex items-center gap-4">
-                        <i className={`fas fa-moon ${currentUser.theme === 'dark' ? 'text-emerald-500' : 'text-slate-400'}`}></i>
-                        <span className={`font-bold ${currentUser.theme === 'dark' ? 'text-emerald-100' : 'text-slate-500'}`}>Dark Soft (Sombre)</span>
+                        <i className={`fas fa-moon ${currentUser.theme === 'dark' ? 'text-violet-500' : 'text-slate-400'}`}></i>
+                        <span className={`font-bold ${currentUser.theme === 'dark' ? 'text-violet-100' : 'text-slate-500'}`}>Dark Soft (Sombre)</span>
                       </div>
-                      {currentUser.theme === 'dark' && <i className="fas fa-check-circle text-emerald-500"></i>}
+                      {currentUser.theme === 'dark' && <i className="fas fa-check-circle text-violet-500"></i>}
                     </button>
                   </div>
                 </section>
@@ -1271,13 +1539,13 @@ const App: React.FC = () => {
                       <div className={`flex p-1 rounded-2xl ${isDarkMode ? 'bg-slate-800' : 'bg-slate-100'}`}>
                         <button 
                           onClick={() => updateProfile({ unit: 'celsius' })}
-                          className={`flex-1 py-3 rounded-xl font-bold text-sm transition-all ${currentUser.unit === 'celsius' ? 'bg-emerald-600 text-white shadow-lg shadow-emerald-600/20' : 'text-slate-400'}`}
+                          className={`flex-1 py-3 rounded-xl font-bold text-sm transition-all ${currentUser.unit === 'celsius' ? 'bg-violet-600 text-white shadow-lg shadow-violet-600/20' : 'text-slate-400'}`}
                         >
                           Celsius (°C)
                         </button>
                         <button 
                           onClick={() => updateProfile({ unit: 'fahrenheit' })}
-                          className={`flex-1 py-3 rounded-xl font-bold text-sm transition-all ${currentUser.unit === 'fahrenheit' ? 'bg-emerald-600 text-white shadow-lg shadow-emerald-600/20' : 'text-slate-400'}`}
+                          className={`flex-1 py-3 rounded-xl font-bold text-sm transition-all ${currentUser.unit === 'fahrenheit' ? 'bg-violet-600 text-white shadow-lg shadow-violet-600/20' : 'text-slate-400'}`}
                         >
                           Fahrenheit (°F)
                         </button>
@@ -1305,48 +1573,199 @@ const App: React.FC = () => {
             </div>
           )}
 
-          {view === 'plantes' && (
+          {view === 'plantes' && (() => {
+            // Palette de couleurs par station (indexée par position dans le tableau stations)
+            const STATION_PALETTE = [
+              { hex: '#10b981', light: '#d1fae5', border: '#10b981', text: '#059669', label: 'emerald' },
+              { hex: '#3b82f6', light: '#dbeafe', border: '#3b82f6', text: '#2563eb', label: 'blue' },
+              { hex: '#8b5cf6', light: '#ede9fe', border: '#8b5cf6', text: '#7c3aed', label: 'violet' },
+              { hex: '#f59e0b', light: '#fef3c7', border: '#f59e0b', text: '#d97706', label: 'amber' },
+              { hex: '#ec4899', light: '#fce7f3', border: '#ec4899', text: '#db2777', label: 'pink' },
+              { hex: '#06b6d4', light: '#cffafe', border: '#06b6d4', text: '#0891b2', label: 'cyan' },
+              { hex: '#f97316', light: '#ffedd5', border: '#f97316', text: '#ea580c', label: 'orange' },
+              { hex: '#6366f1', light: '#e0e7ff', border: '#6366f1', text: '#4f46e5', label: 'indigo' },
+            ];
+
+            // Pour chaque plante : trouver les stations auxquelles elle est liée
+            const getPlantStations = (plantId: string): { station: Station; colorIdx: number }[] => {
+              const linkedDevices = devices.filter(d => d.currentPlantProfileId === plantId);
+              const stationIds = [...new Set(linkedDevices.map(d => d.stationId).filter(Boolean))];
+              return stationIds
+                .map(sid => {
+                  const station = stations.find(s => s.id === sid);
+                  const colorIdx = stations.findIndex(s => s.id === sid) % STATION_PALETTE.length;
+                  return station ? { station, colorIdx } : null;
+                })
+                .filter(Boolean) as { station: Station; colorIdx: number }[];
+            };
+
+            const linkedCount = plantProfiles.filter(p => devices.some(d => d.currentPlantProfileId === p.id)).length;
+            const unlinkedCount = plantProfiles.length - linkedCount;
+
+            return (
             <div className="space-y-8">
-              <div className="flex justify-between items-center">
-                <p className="text-slate-400 font-medium">Gérez vos types de cultures et leurs besoins spécifiques.</p>
-                <button 
+              {/* En-tête */}
+              <div className="flex justify-between items-center flex-wrap gap-4">
+                <div>
+                  <p className="text-slate-400 font-medium">
+                    {plantProfiles.length} profil{plantProfiles.length !== 1 ? 's' : ''} au total
+                    {unlinkedCount > 0 && (
+                      <span className="ml-2 text-rose-400 font-bold">· {unlinkedCount} non lié{unlinkedCount > 1 ? 's' : ''}</span>
+                    )}
+                  </p>
+                  {/* Légende stations */}
+                  {stations.length > 0 && (
+                    <div className="flex items-center gap-3 mt-2 flex-wrap">
+                      {stations.map((station, idx) => {
+                        const palette = STATION_PALETTE[idx % STATION_PALETTE.length];
+                        return (
+                          <span key={station.id} className="flex items-center gap-1.5 text-[10px] font-bold">
+                            <span className="w-3 h-3 rounded-full flex-shrink-0" style={{ backgroundColor: palette.hex }}></span>
+                            <span className="text-slate-400">{station.name}</span>
+                          </span>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+                <button
                   onClick={() => setEditingPlant({ id: Math.random().toString(36).substr(2, 9), name: '', humidityMin: 50, humidityMax: 80, tempMin: 15, tempMax: 30, lightMin: 50, phMin: 6, phMax: 7, notes: '' })}
-                  className="bg-emerald-600 text-white px-6 py-3 rounded-2xl font-bold flex items-center gap-3 shadow-lg shadow-emerald-100"
+                  className="bg-violet-600 text-white px-6 py-3 rounded-2xl font-bold flex items-center gap-3 shadow-lg shadow-violet-100"
                 >
                   <i className="fas fa-plus"></i> Nouveau Profil
                 </button>
               </div>
 
+              {plantProfiles.length === 0 && (
+                <div className={`${cardClasses} p-16 rounded-[32px] border text-center`}>
+                  <i className="fas fa-seedling text-5xl text-slate-300 mb-6 block"></i>
+                  <p className={`text-xl font-black ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>Aucun profil de plante</p>
+                  <p className="text-sm text-slate-400 mt-2">Créez votre premier profil de culture.</p>
+                </div>
+              )}
+
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-                {plantProfiles.map(plant => (
-                  <div key={plant.id} className={`${cardClasses} p-8 rounded-[32px] border group hover:border-emerald-500/50 transition-all`}>
-                    <div className="flex justify-between items-start mb-6">
-                      <div className="w-16 h-16 bg-emerald-500/10 rounded-2xl flex items-center justify-center text-emerald-600 group-hover:scale-110 transition-transform">
-                        <i className="fas fa-leaf text-2xl"></i>
+                {plantProfiles.map(plant => {
+                  const plantStations = getPlantStations(plant.id);
+                  const isUnlinked = plantStations.length === 0;
+                  const colors = plantStations.map(ps => STATION_PALETTE[ps.colorIdx]);
+
+                  // Dégradé du "wrapper" (bordure visible) : arrêts durs pour bien distinguer chaque couleur
+                  const buildHardGradient = (hexColors: string[], direction = '135deg') => {
+                    if (hexColors.length === 1) return hexColors[0];
+                    const stops = hexColors.flatMap((hex, i) => {
+                      const from = `${Math.round(i * 100 / hexColors.length)}%`;
+                      const to = `${Math.round((i + 1) * 100 / hexColors.length)}%`;
+                      return [`${hex} ${from}`, `${hex} ${to}`];
+                    });
+                    return `linear-gradient(${direction}, ${stops.join(', ')})`;
+                  };
+
+                  const wrapperBackground = isUnlinked
+                    ? '#f43f5e'
+                    : buildHardGradient(colors.map(c => c.hex));
+
+                  // Fond de la carte intérieure
+                  const innerBg = isDarkMode ? '#0f172a' : '#ffffff';
+
+                  // Strip horizontal en haut (arrêts durs, bien visibles)
+                  const stripBackground = colors.length > 1
+                    ? buildHardGradient(colors.map(c => c.hex), 'to right')
+                    : colors.length === 1 ? colors[0].hex : '';
+
+                  return (
+                    // Wrapper = "bordure dégradée" via padding + background gradient
+                    <div
+                      key={plant.id}
+                      className="relative rounded-[32px] group transition-all hover:shadow-2xl"
+                      style={{ background: wrapperBackground, padding: '2.5px' }}
+                    >
+                      {/* Banderole "Non lié" en diagonale — sur le wrapper */}
+                      {isUnlinked && (
+                        <div className="absolute top-6 -right-7 w-36 bg-rose-500 text-white text-[9px] font-black uppercase tracking-widest py-1.5 text-center transform rotate-[35deg] shadow-lg z-20 overflow-hidden">
+                          Non lié
+                        </div>
+                      )}
+
+                      {/* Carte intérieure */}
+                      <div
+                        className="relative overflow-hidden rounded-[30px]"
+                        style={{ backgroundColor: isUnlinked ? (isDarkMode ? '#1e0a0a' : '#fff5f5') : innerBg }}
+                      >
+                        {/* Strip de couleur station(s) en haut — arrêts durs bien visibles */}
+                        {!isUnlinked && colors.length > 0 && (
+                          <div className="h-2.5 w-full" style={{ background: stripBackground }}></div>
+                        )}
+
+                      <div className="p-8">
+                        {/* Header : icône + boutons */}
+                        <div className="flex justify-between items-start mb-6">
+                          <div
+                            className="w-16 h-16 rounded-2xl flex items-center justify-center group-hover:scale-110 transition-transform"
+                            style={isUnlinked
+                              ? { backgroundColor: '#fee2e2', color: '#ef4444' }
+                              : colors.length === 1
+                              ? { backgroundColor: `${colors[0].hex}22`, color: colors[0].text }
+                              : { background: buildHardGradient(colors.map(c => c.hex + '44'), '135deg'), color: colors[0].text }
+                            }
+                          >
+                            <i className="fas fa-leaf text-2xl"></i>
+                          </div>
+                          <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                            <button onClick={() => setEditingPlant(plant)} className={`p-3 rounded-xl transition-colors ${isDarkMode ? 'bg-slate-800 text-slate-400 hover:text-violet-500' : 'bg-slate-100 text-slate-400 hover:text-violet-600'}`}><i className="fas fa-edit"></i></button>
+                            <button onClick={() => setDeletingPlantId(plant.id)} className={`p-3 rounded-xl transition-colors ${isDarkMode ? 'bg-slate-800 text-slate-400 hover:text-rose-500' : 'bg-slate-100 text-slate-400 hover:text-rose-500'}`}><i className="fas fa-trash"></i></button>
+                          </div>
+                        </div>
+
+                        <h3 className={`text-2xl font-black mb-2 ${isDarkMode ? 'text-slate-100' : 'text-slate-800'}`}>{plant.name}</h3>
+                        <p className="text-sm text-slate-400 mb-4 line-clamp-2 h-10">{plant.notes || <span className="italic">Aucune note</span>}</p>
+
+                        {/* Badges des stations liées */}
+                        {isUnlinked ? (
+                          <p className="text-xs font-bold text-rose-400 flex items-center gap-1.5 mb-4">
+                            <i className="fas fa-unlink"></i> Non assignée à un bac
+                          </p>
+                        ) : (
+                          <div className="flex flex-wrap gap-2 mb-4">
+                            {plantStations.map(ps => {
+                              const palette = STATION_PALETTE[ps.colorIdx];
+                              return (
+                                <span
+                                  key={ps.station.id}
+                                  className="text-[10px] font-black px-2.5 py-1 rounded-xl"
+                                  style={{ backgroundColor: `${palette.hex}20`, color: palette.text }}
+                                >
+                                  <i className="fas fa-layer-group mr-1"></i>{ps.station.name}
+                                </span>
+                              );
+                            })}
+                          </div>
+                        )}
+
+                        <button
+                          onClick={() => {
+                            if (selectedDeviceId) {
+                              setDevices(prev => prev.map(d => d.id === selectedDeviceId ? { ...d, currentPlantProfileId: plant.id } : d));
+                              setView('dashboard');
+                            }
+                          }}
+                          className={`w-full py-4 rounded-2xl font-black uppercase tracking-widest transition-all active:scale-95 ${
+                            isUnlinked
+                              ? (isDarkMode ? 'bg-rose-500/20 hover:bg-violet-600 text-rose-300 hover:text-white' : 'bg-rose-100 hover:bg-violet-600 text-rose-500 hover:text-white')
+                              : (isDarkMode ? 'bg-slate-800 hover:bg-violet-600 text-slate-100' : 'bg-slate-100 hover:bg-violet-600 hover:text-white text-slate-600')
+                          }`}
+                        >
+                          Appliquer au bac sélectionné
+                        </button>
                       </div>
-                      <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                        <button onClick={() => setEditingPlant(plant)} className={`p-3 rounded-xl transition-colors ${isDarkMode ? 'bg-slate-800 text-slate-400 hover:text-emerald-500' : 'bg-slate-50 text-slate-400 hover:text-emerald-600'}`}><i className="fas fa-edit"></i></button>
-                        <button onClick={() => setDeletingPlantId(plant.id)} className={`p-3 rounded-xl transition-colors ${isDarkMode ? 'bg-slate-800 text-slate-400 hover:text-rose-500' : 'bg-slate-50 text-slate-400 hover:text-rose-500'}`}><i className="fas fa-trash"></i></button>
                       </div>
                     </div>
-                    <h3 className={`text-2xl font-black mb-2 ${isDarkMode ? 'text-slate-100' : 'text-slate-800'}`}>{plant.name}</h3>
-                    <p className="text-sm text-slate-400 mb-6 line-clamp-2 h-10">{plant.notes}</p>
-                    <button 
-                      onClick={() => {
-                        if (selectedDeviceId) {
-                          setDevices(prev => prev.map(d => d.id === selectedDeviceId ? {...d, currentPlantProfileId: plant.id} : d));
-                          setView('dashboard');
-                        }
-                      }}
-                      className={`w-full mt-8 py-4 rounded-2xl font-black uppercase tracking-widest transition-all active:scale-95 ${isDarkMode ? 'bg-slate-800 hover:bg-emerald-600 text-slate-100' : 'bg-slate-50 hover:bg-emerald-600 hover:text-white text-slate-600'}`}
-                    >
-                      Appliquer
-                    </button>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             </div>
-          )}
+            );
+          })()}
 
           {view === 'config' && (() => {
             const GRID_ROWS = 3;
@@ -1360,7 +1779,7 @@ const App: React.FC = () => {
                 <p className="text-slate-400 font-medium">Gérez vos stations et positionnez vos bacs sur la grille.</p>
                 <button
                   onClick={() => setEditingStation({ id: Math.random().toString(36).substr(2, 9), name: '', locationLabel: '', createdAt: new Date().toISOString() })}
-                  className="bg-emerald-600 text-white px-6 py-3 rounded-2xl font-bold flex items-center gap-3 shadow-lg shadow-emerald-100"
+                  className="bg-violet-600 text-white px-6 py-3 rounded-2xl font-bold flex items-center gap-3 shadow-lg shadow-violet-100"
                 >
                   <i className="fas fa-plus"></i> Nouvelle station
                 </button>
@@ -1400,7 +1819,7 @@ const App: React.FC = () => {
                       onClick={() => setExpandedStationId(isExpanded ? null : station.id)}
                     >
                       <div className="flex items-center gap-4">
-                        <div className="w-12 h-12 bg-emerald-600 rounded-2xl flex items-center justify-center text-white shadow-lg shadow-emerald-600/20">
+                        <div className="w-12 h-12 bg-violet-600 rounded-2xl flex items-center justify-center text-white shadow-lg shadow-violet-600/20">
                           <i className="fas fa-layer-group"></i>
                         </div>
                         <div>
@@ -1409,7 +1828,7 @@ const App: React.FC = () => {
                         </div>
                       </div>
                       <div className="flex items-center gap-3">
-                        <button onClick={e => { e.stopPropagation(); setEditingStation(station); }} className={`p-3 rounded-xl transition-colors ${isDarkMode ? 'hover:bg-slate-700 text-slate-400 hover:text-emerald-400' : 'hover:bg-slate-100 text-slate-400 hover:text-emerald-600'}`}>
+                        <button onClick={e => { e.stopPropagation(); setEditingStation(station); }} className={`p-3 rounded-xl transition-colors ${isDarkMode ? 'hover:bg-slate-700 text-slate-400 hover:text-violet-400' : 'hover:bg-slate-100 text-slate-400 hover:text-violet-600'}`}>
                           <i className="fas fa-edit"></i>
                         </button>
                         <button onClick={e => { e.stopPropagation(); handleDeleteStation(station.id); }} className={`p-3 rounded-xl transition-colors ${isDarkMode ? 'hover:bg-rose-500/20 text-slate-400 hover:text-rose-400' : 'hover:bg-rose-50 text-slate-400 hover:text-rose-500'}`}>
@@ -1423,6 +1842,13 @@ const App: React.FC = () => {
                     {isExpanded && (
                       <div className={`px-8 pb-8 border-t ${isDarkMode ? 'border-slate-800' : 'border-slate-100'}`}>
                         <div className="pt-6 space-y-4">
+                          {/* Note d'aide */}
+                          <div className={`flex items-center gap-2.5 px-4 py-3 rounded-2xl text-xs font-medium ${isDarkMode ? 'bg-blue-500/10 text-blue-300' : 'bg-blue-50 text-blue-600'}`}>
+                            <i className="fas fa-circle-info flex-shrink-0"></i>
+                            <span>
+                              Survolez un bac pour accéder à son icône <i className="fas fa-gear mx-1"></i><strong>Paramètres</strong> — automatisation (arrosage, ventilation, éclairage), taille du bac, fréquence de mesure.
+                            </span>
+                          </div>
                           {swapSourceBacId && (
                             <p className="text-xs font-bold text-amber-500 flex items-center gap-2">
                               <i className="fas fa-arrows-rotate"></i>
@@ -1448,12 +1874,12 @@ const App: React.FC = () => {
                                           ? 'border-amber-400 bg-amber-400/10 scale-105'
                                           : hasNoPlant
                                           ? 'border-rose-400/60 bg-rose-500/10 animate-pulse'
-                                          : (isDarkMode ? 'border-slate-700 bg-slate-800 hover:border-emerald-500/50' : 'border-slate-200 bg-slate-50 hover:border-emerald-400')
+                                          : (isDarkMode ? 'border-slate-700 bg-slate-800 hover:border-violet-500/50' : 'border-slate-200 bg-slate-50 hover:border-violet-400')
                                       }`}
                                     >
                                       <p className={`text-[10px] font-black uppercase tracking-wider truncate ${isDarkMode ? 'text-slate-300' : 'text-slate-700'}`}>{bac.name}</p>
                                       {plant ? (
-                                        <p className="text-[10px] text-emerald-500 font-bold mt-1 truncate flex items-center gap-1"><i className="fas fa-seedling"></i>{plant.name}</p>
+                                        <p className="text-[10px] text-violet-500 font-bold mt-1 truncate flex items-center gap-1"><i className="fas fa-seedling"></i>{plant.name}</p>
                                       ) : (
                                         <p className="text-[10px] text-rose-400 font-bold mt-1 flex items-center gap-1"><i className="fas fa-exclamation-circle"></i>Aucune plante</p>
                                       )}
@@ -1467,9 +1893,9 @@ const App: React.FC = () => {
                                         <option value="">— Aucune plante —</option>
                                         {plantProfiles.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
                                       </select>
-                                      <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                                        <button onClick={e => { e.stopPropagation(); setConfiguringBacId(bac.id); }} className="w-5 h-5 rounded-full bg-blue-500/20 text-blue-400 flex items-center justify-center text-[9px]"><i className="fas fa-gear"></i></button>
-                                        <button onClick={e => { e.stopPropagation(); handleDeleteBac(bac.id); }} className="w-5 h-5 rounded-full bg-rose-500/20 text-rose-400 flex items-center justify-center text-[9px]"><i className="fas fa-times"></i></button>
+                                      <div className="absolute top-2 right-2 flex gap-1">
+                                        <button onClick={e => { e.stopPropagation(); setConfiguringBacId(bac.id); }} className="w-5 h-5 rounded-full bg-blue-500/20 text-blue-400 flex items-center justify-center text-[9px] opacity-40 group-hover:opacity-100 hover:bg-blue-500/40 transition-all" title="Paramètres du bac"><i className="fas fa-gear"></i></button>
+                                        <button onClick={e => { e.stopPropagation(); handleDeleteBac(bac.id); }} className="w-5 h-5 rounded-full bg-rose-500/20 text-rose-400 flex items-center justify-center text-[9px] opacity-0 group-hover:opacity-100 hover:bg-rose-500/40 transition-all"><i className="fas fa-times"></i></button>
                                       </div>
                                     </div>
                                   );
@@ -1478,7 +1904,7 @@ const App: React.FC = () => {
                                   <div
                                     key={`${row}-${col}`}
                                     onClick={() => { setEditingBac({ stationId: station.id, row, col }); setNewBacName(''); }}
-                                    className={`min-h-[90px] p-3 rounded-2xl border-2 border-dashed cursor-pointer flex items-center justify-center transition-all ${isDarkMode ? 'border-slate-700 hover:border-emerald-500/50 hover:bg-emerald-500/5' : 'border-slate-200 hover:border-emerald-400 hover:bg-emerald-50'}`}
+                                    className={`min-h-[90px] p-3 rounded-2xl border-2 border-dashed cursor-pointer flex items-center justify-center transition-all ${isDarkMode ? 'border-slate-700 hover:border-violet-500/50 hover:bg-violet-500/5' : 'border-slate-200 hover:border-violet-400 hover:bg-violet-50'}`}
                                   >
                                     <i className="fas fa-plus text-slate-300 text-lg"></i>
                                   </div>
@@ -1497,11 +1923,22 @@ const App: React.FC = () => {
             );
           })()}
 
-          {view === 'activities' && (
-            <div className="space-y-8">
-              <p className="text-slate-400 font-medium">Historique des actions sur toutes vos stations.</p>
+          {view === 'activities' && (() => {
+            // Trier les événements par date décroissante et dédupliquer
+            const uniqueEvents = wateringEvents
+              .filter((e, idx, arr) => arr.findIndex(x => x.id === e.id) === idx)
+              .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
 
-              {wateringEvents.length === 0 ? (
+            return (
+            <div className="space-y-8">
+              <div className="flex items-center justify-between">
+                <p className="text-slate-400 font-medium">
+                  Historique des arrosages sur toutes vos stations.
+                  {uniqueEvents.length > 0 && ` · ${uniqueEvents.length} événement${uniqueEvents.length > 1 ? 's' : ''}`}
+                </p>
+              </div>
+
+              {uniqueEvents.length === 0 ? (
                 <div className={`${cardClasses} p-16 rounded-[32px] border text-center`}>
                   <i className="fas fa-history text-5xl text-slate-300 mb-6 block"></i>
                   <p className={`text-xl font-black ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>Aucune activité</p>
@@ -1509,12 +1946,12 @@ const App: React.FC = () => {
                 </div>
               ) : (
                 <div className="space-y-4">
-                  {/* Timeline */}
-                  {wateringEvents.map((event, idx) => {
+                  {uniqueEvents.map((event, idx) => {
                     const deviceInfo = devices.find(d => d.id === event.deviceId);
+                    const stationInfo = stations.find(s => s.id === deviceInfo?.stationId);
                     const isAuto = event.mode === WateringMode.AUTO;
                     return (
-                      <div key={event.id} className="flex gap-4">
+                      <div key={`${event.id}-${idx}`} className="flex gap-4">
                         {/* Timeline line */}
                         <div className="flex flex-col items-center">
                           <div className={`w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 ${
@@ -1524,7 +1961,7 @@ const App: React.FC = () => {
                           }`}>
                             <i className={`fas ${isAuto ? 'fa-robot' : 'fa-hand-pointer'} text-sm`}></i>
                           </div>
-                          {idx < wateringEvents.length - 1 && (
+                          {idx < uniqueEvents.length - 1 && (
                             <div className={`w-0.5 flex-1 mt-2 ${isDarkMode ? 'bg-slate-800' : 'bg-slate-200'}`}></div>
                           )}
                         </div>
@@ -1532,19 +1969,26 @@ const App: React.FC = () => {
                         {/* Event card */}
                         <div className={`${cardClasses} flex-1 p-6 rounded-2xl border mb-2`}>
                           <div className="flex items-center justify-between mb-2">
-                            <div className="flex items-center gap-3">
+                            <div className="flex items-center gap-3 flex-wrap">
                               <span className={`text-xs font-black uppercase tracking-wider ${isAuto ? 'text-violet-500' : 'text-blue-500'}`}>
                                 {isAuto ? 'AUTO' : 'MANUEL'}
                               </span>
                               <span className={`text-[10px] font-bold px-2 py-0.5 rounded-lg ${isDarkMode ? 'bg-slate-800 text-slate-400' : 'bg-slate-100 text-slate-500'}`}>
-                                <i className="fas fa-microchip mr-1"></i>{deviceInfo?.name || 'Station'}
+                                <i className="fas fa-microchip mr-1"></i>{deviceInfo?.name || 'Bac inconnu'}
                               </span>
+                              {stationInfo && (
+                                <span className={`text-[10px] font-bold px-2 py-0.5 rounded-lg ${isDarkMode ? 'bg-violet-900/30 text-violet-400' : 'bg-violet-50 text-violet-600'}`}>
+                                  <i className="fas fa-layer-group mr-1"></i>{stationInfo.name}
+                                </span>
+                              )}
                             </div>
                             <span className={`text-sm font-black ${isDarkMode ? 'text-slate-200' : 'text-slate-700'}`}>
                               <i className="fas fa-stopwatch mr-1 text-xs"></i>{event.durationSec}s
                             </span>
                           </div>
-                          <p className={`text-sm ${isDarkMode ? 'text-slate-300' : 'text-slate-600'}`}>{event.reason}</p>
+                          {event.reason && (
+                            <p className={`text-sm ${isDarkMode ? 'text-slate-300' : 'text-slate-600'}`}>{event.reason}</p>
+                          )}
                           <p className="text-[10px] text-slate-400 mt-2">
                             <i className="fas fa-clock mr-1"></i>{new Date(event.timestamp).toLocaleString()}
                           </p>
@@ -1555,7 +1999,8 @@ const App: React.FC = () => {
                 </div>
               )}
             </div>
-          )}
+            );
+          })()}
 
           {view === 'alerts' && (() => {
             const alertIcon = (type: AlertType) => {
@@ -1575,13 +2020,15 @@ const App: React.FC = () => {
               return 'fa-sun';
             };
 
-            // Clic sur une alerte → naviguer vers le dashboard avec le bon device + plante
+            // Clic sur une alerte → redirection + marquer comme lue
             const handleAlertClick = (alert: Alert) => {
-              // Sélectionner le device de l'alerte
+              // Marquer comme lue
+              setAlerts(prev => prev.map(a => a.id === alert.id ? { ...a, read: true } : a));
+              const device = devices.find(d => d.id === alert.deviceId);
+              if (device?.stationId) setSelectedStationId(device.stationId);
               setSelectedDeviceId(alert.deviceId);
-              // Assigner la plante de l'alerte au device pour l'afficher sur le dashboard
               const plant = plantProfiles.find(p => p.name === alert.plantName);
-              if (plant) {
+              if (plant && device?.currentPlantProfileId !== plant.id) {
                 setDevices(prev => prev.map(d =>
                   d.id === alert.deviceId ? { ...d, currentPlantProfileId: plant.id } : d
                 ));
@@ -1589,33 +2036,67 @@ const App: React.FC = () => {
               setView('dashboard');
             };
 
-            // Grouper les alertes par device
-            const alertsByDevice: Record<string, Alert[]> = {};
-            alerts.forEach(a => {
-              if (!alertsByDevice[a.deviceId]) alertsByDevice[a.deviceId] = [];
-              alertsByDevice[a.deviceId].push(a);
-            });
-            // Trier chaque groupe par sévérité (critical > warning > info) puis timestamp
+            // Supprimer une alerte individuelle
+            const handleDeleteAlert = (e: React.MouseEvent, alertId: string) => {
+              e.stopPropagation();
+              setAlerts(prev => prev.filter(a => a.id !== alertId));
+            };
+
+            // Marquer toutes comme lues
+            const markAllRead = () => setAlerts(prev => prev.map(a => ({ ...a, read: true })));
+
+            const unreadCount = alerts.filter(a => !a.read).length;
+
+            // Grouper les alertes par station (toutes les stations affichées)
             const severityOrder = { critical: 0, warning: 1, info: 2 };
-            Object.values(alertsByDevice).forEach(group =>
-              group.sort((a, b) => severityOrder[a.type] - severityOrder[b.type] || new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
+            const alertsByStation: Record<string, { station: Station | null; deviceGroups: Record<string, Alert[]> }> = {};
+            alerts.forEach(a => {
+              const device = devices.find(d => d.id === a.deviceId);
+              const stationId = device?.stationId || '__none__';
+              if (!alertsByStation[stationId]) {
+                alertsByStation[stationId] = {
+                  station: stations.find(s => s.id === stationId) || null,
+                  deviceGroups: {},
+                };
+              }
+              if (!alertsByStation[stationId].deviceGroups[a.deviceId]) {
+                alertsByStation[stationId].deviceGroups[a.deviceId] = [];
+              }
+              alertsByStation[stationId].deviceGroups[a.deviceId].push(a);
+            });
+            // Trier les alertes de chaque device
+            Object.values(alertsByStation).forEach(stationGroup =>
+              Object.values(stationGroup.deviceGroups).forEach(group =>
+                group.sort((a, b) => severityOrder[a.type] - severityOrder[b.type] || new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
+              )
             );
+            const totalStationsWithAlerts = Object.keys(alertsByStation).length;
 
             return (
               <div className="space-y-6">
-                <div className="flex justify-between items-center">
+                <div className="flex justify-between items-center gap-4 flex-wrap">
                   <p className="text-slate-400 font-medium">
                     {alerts.length > 0
-                      ? `${alerts.length} alerte${alerts.length > 1 ? 's' : ''} active${alerts.length > 1 ? 's' : ''} sur ${Object.keys(alertsByDevice).length} station${Object.keys(alertsByDevice).length > 1 ? 's' : ''}`
+                      ? `${alerts.length} alerte${alerts.length > 1 ? 's' : ''} · ${unreadCount > 0 ? `${unreadCount} non lue${unreadCount > 1 ? 's' : ''}` : 'toutes lues'} · ${totalStationsWithAlerts} station${totalStationsWithAlerts > 1 ? 's' : ''}`
                       : 'Aucune alerte active'}
                   </p>
                   {alerts.length > 0 && (
-                    <button
-                      onClick={() => setAlerts([])}
-                      className={`px-5 py-2.5 rounded-2xl text-xs font-bold uppercase tracking-wider transition-all ${isDarkMode ? 'bg-slate-800 text-rose-400 hover:bg-rose-500/20' : 'bg-slate-100 text-rose-500 hover:bg-rose-50'}`}
-                    >
-                      <i className="fas fa-trash mr-2"></i>Tout effacer
-                    </button>
+                    <div className="flex items-center gap-2">
+                      {unreadCount > 0 && (
+                        <button
+                          onClick={markAllRead}
+                          className={`px-4 py-2 rounded-2xl text-xs font-bold uppercase tracking-wider transition-all ${isDarkMode ? 'bg-slate-800 text-blue-400 hover:bg-blue-500/20' : 'bg-slate-100 text-blue-600 hover:bg-blue-50'}`}
+                        >
+                          <i className="fas fa-check-double mr-1.5"></i>Tout marquer lu
+                        </button>
+                      )}
+                      <button
+                        onClick={() => setAlerts([])}
+                        className={`px-4 py-2 rounded-2xl text-xs font-bold uppercase tracking-wider transition-all ${isDarkMode ? 'bg-slate-800 text-rose-400 hover:bg-rose-500/20' : 'bg-slate-100 text-rose-500 hover:bg-rose-50'}`}
+                      >
+                        <i className="fas fa-trash mr-1.5"></i>Tout effacer
+                      </button>
+                    </div>
                   )}
                 </div>
 
@@ -1626,61 +2107,102 @@ const App: React.FC = () => {
                     <p className="text-sm text-slate-400 mt-2">Aucune alerte active. Toutes vos plantes sont dans les seuils.</p>
                   </div>
                 ) : (
-                  <div className="space-y-8">
-                    {Object.entries(alertsByDevice).map(([deviceId, deviceAlerts]) => {
-                      const deviceInfo = devices.find(d => d.id === deviceId);
+                  <div className="space-y-10">
+                    {Object.entries(alertsByStation).map(([stationId, { station, deviceGroups }]) => {
+                      const stationAlertCount = Object.values(deviceGroups).reduce((sum, g) => sum + g.length, 0);
                       return (
-                        <div key={deviceId}>
-                          {/* En-tête du device */}
-                          <div className="flex items-center gap-3 mb-4">
-                            <div className={`w-8 h-8 rounded-xl flex items-center justify-center ${isDarkMode ? 'bg-slate-800' : 'bg-slate-100'}`}>
-                              <i className={`fas fa-microchip text-sm ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}></i>
+                        <div key={stationId}>
+                          {/* En-tête station */}
+                          <div className="flex items-center gap-3 mb-5">
+                            <div className="w-10 h-10 bg-violet-600 rounded-2xl flex items-center justify-center text-white shadow-lg shadow-violet-600/20">
+                              <i className="fas fa-layer-group text-sm"></i>
                             </div>
-                            <h3 className={`text-lg font-black ${isDarkMode ? 'text-slate-200' : 'text-slate-700'}`}>
-                              {deviceInfo?.name || 'Station inconnue'}
-                            </h3>
-                            <span className={`text-[10px] font-bold px-2.5 py-1 rounded-lg ${isDarkMode ? 'bg-slate-800 text-slate-500' : 'bg-slate-100 text-slate-400'}`}>
-                              {deviceAlerts.length} alerte{deviceAlerts.length > 1 ? 's' : ''}
+                            <div>
+                              <h3 className={`text-xl font-black ${isDarkMode ? 'text-slate-100' : 'text-slate-800'}`}>
+                                {station?.name || 'Station inconnue'}
+                              </h3>
+                              {station?.locationLabel && (
+                                <p className="text-xs text-slate-400"><i className="fas fa-location-dot mr-1"></i>{station.locationLabel}</p>
+                              )}
+                            </div>
+                            <span className={`ml-auto text-[10px] font-bold px-3 py-1 rounded-xl ${isDarkMode ? 'bg-rose-500/20 text-rose-400' : 'bg-rose-50 text-rose-500'}`}>
+                              {stationAlertCount} alerte{stationAlertCount > 1 ? 's' : ''}
                             </span>
                           </div>
 
-                          {/* Alertes du device */}
-                          <div className="space-y-3">
-                            {deviceAlerts.map(alert => (
-                              <div
-                                key={alert.id}
-                                onClick={() => handleAlertClick(alert)}
-                                className={`${alertBg(alert.type)} border rounded-2xl p-5 flex items-start gap-4 cursor-pointer transition-all hover:scale-[1.005] hover:shadow-lg group`}
-                              >
-                                <div className="pt-0.5">
-                                  <i className={`fas ${alertIcon(alert.type)} text-lg`}></i>
-                                </div>
-                                <div className="flex-1 min-w-0">
-                                  <div className="flex items-center gap-3 mb-1 flex-wrap">
-                                    <span className={`text-xs font-black uppercase tracking-wider ${
-                                      alert.type === 'critical' ? 'text-rose-500'
-                                      : alert.type === 'warning' ? 'text-amber-500'
-                                      : 'text-blue-400'
-                                    }`}>
-                                      {alert.type}
+                          {/* Groupes par device/bac */}
+                          <div className="space-y-6 pl-4 border-l-2 border-violet-600/20 ml-4">
+                            {Object.entries(deviceGroups).map(([deviceId, deviceAlerts]) => {
+                              const deviceInfo = devices.find(d => d.id === deviceId);
+                              return (
+                                <div key={deviceId}>
+                                  <div className="flex items-center gap-2 mb-3">
+                                    <div className={`w-6 h-6 rounded-lg flex items-center justify-center ${isDarkMode ? 'bg-slate-800' : 'bg-slate-100'}`}>
+                                      <i className={`fas fa-microchip text-[10px] ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}></i>
+                                    </div>
+                                    <span className={`text-sm font-black ${isDarkMode ? 'text-slate-300' : 'text-slate-600'}`}>
+                                      {deviceInfo?.name || 'Bac inconnu'}
                                     </span>
-                                    <span className={`text-[10px] font-bold px-2 py-0.5 rounded-lg ${isDarkMode ? 'bg-emerald-900/40 text-emerald-400' : 'bg-emerald-100 text-emerald-700'}`}>
-                                      <i className="fas fa-seedling mr-1"></i>{alert.plantName}
-                                    </span>
-                                    <span className={`text-[10px] font-bold px-2 py-0.5 rounded-lg ${isDarkMode ? 'bg-slate-800 text-slate-400' : 'bg-slate-200/70 text-slate-500'}`}>
-                                      <i className={`fas ${categoryIcon(alert.category)} mr-1`}></i>{alert.category}
+                                    <span className={`text-[10px] font-bold px-2 py-0.5 rounded-lg ${isDarkMode ? 'bg-slate-800 text-slate-500' : 'bg-slate-100 text-slate-400'}`}>
+                                      {deviceAlerts.length} alerte{deviceAlerts.length > 1 ? 's' : ''}
                                     </span>
                                   </div>
-                                  <p className={`text-sm font-bold ${isDarkMode ? 'text-slate-200' : 'text-slate-700'}`}>{alert.message}</p>
-                                  <div className="flex items-center justify-between mt-2">
-                                    <p className="text-[10px] text-slate-400">{new Date(alert.timestamp).toLocaleString()}</p>
-                                    <span className={`text-[10px] font-bold opacity-0 group-hover:opacity-100 transition-opacity ${isDarkMode ? 'text-emerald-400' : 'text-emerald-600'}`}>
-                                      <i className="fas fa-arrow-right mr-1"></i>Voir le dashboard
-                                    </span>
+
+                                  <div className="space-y-3">
+                                    {deviceAlerts.map(alert => (
+                                      <div
+                                        key={alert.id}
+                                        onClick={() => handleAlertClick(alert)}
+                                        className={`${alertBg(alert.type)} border rounded-2xl p-5 flex items-start gap-4 cursor-pointer transition-all hover:scale-[1.005] hover:shadow-lg group ${alert.read ? 'opacity-60' : ''}`}
+                                      >
+                                        {/* Indicateur non lu */}
+                                        <div className="pt-0.5 flex flex-col items-center gap-2">
+                                          <i className={`fas ${alertIcon(alert.type)} text-lg`}></i>
+                                          {!alert.read && (
+                                            <div className="w-2 h-2 rounded-full bg-rose-500"></div>
+                                          )}
+                                        </div>
+                                        <div className="flex-1 min-w-0">
+                                          <div className="flex items-center gap-3 mb-1 flex-wrap">
+                                            <span className={`text-xs font-black uppercase tracking-wider ${
+                                              alert.type === 'critical' ? 'text-rose-500'
+                                              : alert.type === 'warning' ? 'text-amber-500'
+                                              : 'text-blue-400'
+                                            }`}>
+                                              {alert.type}
+                                            </span>
+                                            {!alert.read && (
+                                              <span className="text-[10px] font-black uppercase tracking-wider text-rose-500 px-1.5 py-0.5 rounded-md bg-rose-500/10">Nouveau</span>
+                                            )}
+                                            <span className={`text-[10px] font-bold px-2 py-0.5 rounded-lg ${isDarkMode ? 'bg-violet-900/40 text-violet-400' : 'bg-violet-100 text-violet-700'}`}>
+                                              <i className="fas fa-seedling mr-1"></i>{alert.plantName}
+                                            </span>
+                                            <span className={`text-[10px] font-bold px-2 py-0.5 rounded-lg ${isDarkMode ? 'bg-slate-800 text-slate-400' : 'bg-slate-200/70 text-slate-500'}`}>
+                                              <i className={`fas ${categoryIcon(alert.category)} mr-1`}></i>{alert.category}
+                                            </span>
+                                          </div>
+                                          <p className={`text-sm font-bold ${isDarkMode ? 'text-slate-200' : 'text-slate-700'}`}>{alert.message}</p>
+                                          <div className="flex items-center justify-between mt-2">
+                                            <p className="text-[10px] text-slate-400">{new Date(alert.timestamp).toLocaleString()}</p>
+                                            <span className={`text-[10px] font-bold opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-1 ${isDarkMode ? 'text-violet-400' : 'text-violet-600'}`}>
+                                              <i className="fas fa-arrow-right"></i>Voir le dashboard
+                                            </span>
+                                          </div>
+                                        </div>
+                                        {/* Bouton supprimer */}
+                                        <button
+                                          onClick={(e) => handleDeleteAlert(e, alert.id)}
+                                          className={`opacity-0 group-hover:opacity-100 transition-opacity p-1.5 rounded-xl hover:bg-rose-500/20 flex-shrink-0 ${isDarkMode ? 'text-slate-500 hover:text-rose-400' : 'text-slate-400 hover:text-rose-500'}`}
+                                          title="Supprimer cette alerte"
+                                        >
+                                          <i className="fas fa-xmark text-sm"></i>
+                                        </button>
+                                      </div>
+                                    ))}
                                   </div>
                                 </div>
-                              </div>
-                            ))}
+                              );
+                            })}
                           </div>
                         </div>
                       );
@@ -1723,16 +2245,16 @@ const App: React.FC = () => {
             <div className="space-y-4">
               <div className="space-y-2">
                 <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest ml-1">Nom de la station</label>
-                <input type="text" value={editingStation.name} onChange={e => setEditingStation({ ...editingStation, name: e.target.value })} placeholder="Ex: Station Jardin" className={`w-full ${inputClasses} rounded-2xl p-4 font-bold outline-none focus:ring-2 focus:ring-emerald-500`} autoFocus />
+                <input type="text" value={editingStation.name} onChange={e => setEditingStation({ ...editingStation, name: e.target.value })} placeholder="Ex: Station Jardin" className={`w-full ${inputClasses} rounded-2xl p-4 font-bold outline-none focus:ring-2 focus:ring-violet-500`} autoFocus />
               </div>
               <div className="space-y-2">
                 <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest ml-1">Emplacement</label>
-                <input type="text" value={editingStation.locationLabel} onChange={e => setEditingStation({ ...editingStation, locationLabel: e.target.value })} placeholder="Ex: Jardin, Balcon, Serre..." className={`w-full ${inputClasses} rounded-2xl p-4 font-bold outline-none focus:ring-2 focus:ring-emerald-500`} />
+                <input type="text" value={editingStation.locationLabel} onChange={e => setEditingStation({ ...editingStation, locationLabel: e.target.value })} placeholder="Ex: Jardin, Balcon, Serre..." className={`w-full ${inputClasses} rounded-2xl p-4 font-bold outline-none focus:ring-2 focus:ring-violet-500`} />
               </div>
             </div>
             <div className="flex gap-4 pt-2">
               <button onClick={() => setEditingStation(null)} className={`flex-1 py-4 rounded-2xl font-black uppercase tracking-widest ${isDarkMode ? 'bg-slate-800 text-slate-300 hover:bg-slate-700' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}>Annuler</button>
-              <button onClick={() => { if (editingStation.name.trim()) handleSaveStation(editingStation); }} className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white py-4 rounded-2xl font-black uppercase tracking-widest shadow-lg shadow-emerald-600/20">Enregistrer</button>
+              <button onClick={() => { if (editingStation.name.trim()) handleSaveStation(editingStation); }} className="flex-1 bg-violet-600 hover:bg-violet-700 text-white py-4 rounded-2xl font-black uppercase tracking-widest shadow-lg shadow-violet-600/20">Enregistrer</button>
             </div>
           </div>
         </div>
@@ -1758,7 +2280,7 @@ const App: React.FC = () => {
               <div className="space-y-3">
                 <div className="space-y-1">
                   <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest ml-1">Nom</label>
-                  <input type="text" value={bac.name} onChange={e => update({ name: e.target.value })} className={`w-full ${inputClasses} rounded-2xl p-3 font-bold outline-none focus:ring-2 focus:ring-emerald-500`} />
+                  <input type="text" value={bac.name} onChange={e => update({ name: e.target.value })} className={`w-full ${inputClasses} rounded-2xl p-3 font-bold outline-none focus:ring-2 focus:ring-violet-500`} />
                 </div>
                 <div className="grid grid-cols-2 gap-3">
                   <div className="space-y-1">
@@ -1775,8 +2297,8 @@ const App: React.FC = () => {
                   </div>
                 </div>
                 {bac.physicalId && (
-                  <div className={`p-3 rounded-xl flex items-center gap-2 ${isDarkMode ? 'bg-emerald-500/10' : 'bg-emerald-50'}`}>
-                    <i className="fas fa-link text-emerald-500 text-xs"></i>
+                  <div className={`p-3 rounded-xl flex items-center gap-2 ${isDarkMode ? 'bg-violet-500/10' : 'bg-violet-50'}`}>
+                    <i className="fas fa-link text-violet-500 text-xs"></i>
                     <p className={`text-[10px] font-mono truncate ${isDarkMode ? 'text-slate-300' : 'text-slate-600'}`}>{bac.physicalId}</p>
                   </div>
                 )}
@@ -1808,7 +2330,7 @@ const App: React.FC = () => {
                   );
                 })}
               </div>
-              <button onClick={() => setConfiguringBacId(null)} className="w-full py-4 rounded-2xl bg-emerald-600 hover:bg-emerald-700 text-white font-black uppercase tracking-widest">Fermer</button>
+              <button onClick={() => setConfiguringBacId(null)} className="w-full py-4 rounded-2xl bg-violet-600 hover:bg-violet-700 text-white font-black uppercase tracking-widest">Fermer</button>
             </div>
           </div>
         );
@@ -1819,23 +2341,23 @@ const App: React.FC = () => {
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 backdrop-blur-sm" onClick={() => { setEditingBac(null); setNewBacName(''); setNewBacPhysicalId(''); }}>
           <div className={`w-full max-w-md mx-4 max-h-[90vh] overflow-y-auto ${cardClasses} rounded-[32px] border shadow-2xl p-10 space-y-6`} onClick={e => e.stopPropagation()}>
             <h3 className={`text-xl font-black ${isDarkMode ? 'text-slate-100' : 'text-slate-800'}`}>
-              <i className="fas fa-box mr-2 text-emerald-500"></i>Nouveau bac
+              <i className="fas fa-box mr-2 text-violet-500"></i>Nouveau bac
             </h3>
             <div className="space-y-2">
               <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest ml-1">Nom du bac</label>
               <input
                 type="text" value={newBacName} onChange={e => setNewBacName(e.target.value)}
                 placeholder="Ex: Bac Tomates" autoFocus
-                className={`w-full ${inputClasses} rounded-2xl p-4 font-bold outline-none focus:ring-2 focus:ring-emerald-500`}
+                className={`w-full ${inputClasses} rounded-2xl p-4 font-bold outline-none focus:ring-2 focus:ring-violet-500`}
               />
             </div>
 
             {/* Lien physique QR / manuel */}
             {newBacPhysicalId ? (
-              <div className={`p-4 rounded-2xl flex items-center gap-3 ${isDarkMode ? 'bg-emerald-500/10' : 'bg-emerald-50'}`}>
-                <i className="fas fa-link text-emerald-500"></i>
+              <div className={`p-4 rounded-2xl flex items-center gap-3 ${isDarkMode ? 'bg-violet-500/10' : 'bg-violet-50'}`}>
+                <i className="fas fa-link text-violet-500"></i>
                 <div className="flex-1 min-w-0">
-                  <p className="text-xs font-bold text-emerald-500">Bac physique lié</p>
+                  <p className="text-xs font-bold text-violet-500">Bac physique lié</p>
                   <p className={`text-[10px] font-mono truncate ${isDarkMode ? 'text-slate-300' : 'text-slate-600'}`}>{newBacPhysicalId}</p>
                 </div>
                 <button onClick={() => setNewBacPhysicalId('')} className="text-slate-400 hover:text-rose-400 text-xs"><i className="fas fa-times"></i></button>
@@ -1865,7 +2387,7 @@ const App: React.FC = () => {
                   setEditingBac(null); setNewBacName(''); setNewBacPhysicalId('');
                 }}
                 disabled={!newBacName.trim()}
-                className="flex-1 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-40 text-white py-4 rounded-2xl font-black uppercase tracking-widest shadow-lg shadow-emerald-600/20"
+                className="flex-1 bg-violet-600 hover:bg-violet-700 disabled:opacity-40 text-white py-4 rounded-2xl font-black uppercase tracking-widest shadow-lg shadow-violet-600/20"
               >
                 Créer le bac
               </button>
@@ -1896,7 +2418,7 @@ const App: React.FC = () => {
                   value={catalogSearch}
                   onChange={e => setCatalogSearch(e.target.value)}
                   placeholder="Ex: Rosa, Lavandula, Mentha, Solanum..."
-                  className={`w-full ${inputClasses} rounded-2xl p-4 pl-11 font-bold outline-none focus:ring-2 focus:ring-emerald-500 transition-all`}
+                  className={`w-full ${inputClasses} rounded-2xl p-4 pl-11 font-bold outline-none focus:ring-2 focus:ring-violet-500 transition-all`}
                 />
                 <i className={`fas ${catalogLoading ? 'fa-spinner fa-spin' : 'fa-leaf'} absolute left-4 top-1/2 -translate-y-1/2 text-slate-400`}></i>
               </div>
@@ -1908,7 +2430,7 @@ const App: React.FC = () => {
                     <button
                       key={cp.pid + i}
                       onClick={() => applyCatalogPlant(cp)}
-                      className={`w-full text-left px-4 py-3 flex items-center justify-between gap-3 transition-colors ${isDarkMode ? 'hover:bg-emerald-600/20' : 'hover:bg-emerald-50'} ${i > 0 ? (isDarkMode ? 'border-t border-slate-700' : 'border-t border-slate-100') : ''}`}
+                      className={`w-full text-left px-4 py-3 flex items-center justify-between gap-3 transition-colors ${isDarkMode ? 'hover:bg-violet-600/20' : 'hover:bg-violet-50'} ${i > 0 ? (isDarkMode ? 'border-t border-slate-700' : 'border-t border-slate-100') : ''}`}
                     >
                       <div className="min-w-0">
                         <p className={`font-bold text-sm truncate ${isDarkMode ? 'text-slate-100' : 'text-slate-800'}`}>
@@ -1918,7 +2440,7 @@ const App: React.FC = () => {
                       </div>
                       <div className="flex-shrink-0 text-right">
                         <p className="text-[10px] text-slate-400">{cp.temp_min}–{cp.temp_max}°C</p>
-                        <p className="text-[10px] text-emerald-500 font-bold">Hum {cp.humidity_min}–{cp.humidity_max}%</p>
+                        <p className="text-[10px] text-violet-500 font-bold">Hum {cp.humidity_min}–{cp.humidity_max}%</p>
                       </div>
                     </button>
                     );
@@ -1945,7 +2467,7 @@ const App: React.FC = () => {
                   value={editingPlant.name}
                   onChange={e => setEditingPlant({ ...editingPlant, name: e.target.value })}
                   placeholder="Ex: Basilic Grand Vert"
-                  className={`w-full ${inputClasses} rounded-2xl p-4 font-bold outline-none focus:ring-2 focus:ring-emerald-500 transition-all`}
+                  className={`w-full ${inputClasses} rounded-2xl p-4 font-bold outline-none focus:ring-2 focus:ring-violet-500 transition-all`}
                 />
               </div>
 
@@ -1961,7 +2483,7 @@ const App: React.FC = () => {
                   >
                     <i className="fas fa-tint text-blue-400 text-xs"></i>
                     <span className="text-[10px] font-black uppercase text-slate-400 tracking-widest">Humidité du sol (%)</span>
-                    <i className={`fas fa-circle-info text-[10px] transition-colors ${openTooltip === 'humidity' ? 'text-emerald-500' : 'text-slate-300'}`}></i>
+                    <i className={`fas fa-circle-info text-[10px] transition-colors ${openTooltip === 'humidity' ? 'text-violet-500' : 'text-slate-300'}`}></i>
                   </button>
                   {openTooltip === 'humidity' && (
                     <div className={`absolute left-0 top-full mt-2 z-10 w-72 p-3 rounded-xl text-xs shadow-xl border ${isDarkMode ? 'bg-slate-800 border-slate-700 text-slate-300' : 'bg-white border-slate-200 text-slate-600'}`}>
@@ -1972,11 +2494,11 @@ const App: React.FC = () => {
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <span className={`text-[10px] font-bold ml-1 ${isDarkMode ? 'text-slate-500' : 'text-slate-400'}`}>Minimum</span>
-                    <input type="number" min="0" max="100" value={editingPlant.humidityMin} onChange={e => setEditingPlant({ ...editingPlant, humidityMin: +e.target.value })} className={`w-full ${inputClasses} rounded-2xl p-4 font-bold outline-none focus:ring-2 focus:ring-emerald-500`} />
+                    <input type="number" min="0" max="100" value={editingPlant.humidityMin} onChange={e => setEditingPlant({ ...editingPlant, humidityMin: +e.target.value })} className={`w-full ${inputClasses} rounded-2xl p-4 font-bold outline-none focus:ring-2 focus:ring-violet-500`} />
                   </div>
                   <div>
                     <span className={`text-[10px] font-bold ml-1 ${isDarkMode ? 'text-slate-500' : 'text-slate-400'}`}>Maximum</span>
-                    <input type="number" min="0" max="100" value={editingPlant.humidityMax} onChange={e => setEditingPlant({ ...editingPlant, humidityMax: +e.target.value })} className={`w-full ${inputClasses} rounded-2xl p-4 font-bold outline-none focus:ring-2 focus:ring-emerald-500`} />
+                    <input type="number" min="0" max="100" value={editingPlant.humidityMax} onChange={e => setEditingPlant({ ...editingPlant, humidityMax: +e.target.value })} className={`w-full ${inputClasses} rounded-2xl p-4 font-bold outline-none focus:ring-2 focus:ring-violet-500`} />
                   </div>
                 </div>
               </div>
@@ -1993,7 +2515,7 @@ const App: React.FC = () => {
                   >
                     <i className="fas fa-thermometer-half text-amber-400 text-xs"></i>
                     <span className="text-[10px] font-black uppercase text-slate-400 tracking-widest">Température (°C)</span>
-                    <i className={`fas fa-circle-info text-[10px] transition-colors ${openTooltip === 'temp' ? 'text-emerald-500' : 'text-slate-300'}`}></i>
+                    <i className={`fas fa-circle-info text-[10px] transition-colors ${openTooltip === 'temp' ? 'text-violet-500' : 'text-slate-300'}`}></i>
                   </button>
                   {openTooltip === 'temp' && (
                     <div className={`absolute left-0 top-full mt-2 z-10 w-72 p-3 rounded-xl text-xs shadow-xl border ${isDarkMode ? 'bg-slate-800 border-slate-700 text-slate-300' : 'bg-white border-slate-200 text-slate-600'}`}>
@@ -2004,11 +2526,11 @@ const App: React.FC = () => {
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <span className={`text-[10px] font-bold ml-1 ${isDarkMode ? 'text-slate-500' : 'text-slate-400'}`}>Minimum</span>
-                    <input type="number" value={editingPlant.tempMin} onChange={e => setEditingPlant({ ...editingPlant, tempMin: +e.target.value })} className={`w-full ${inputClasses} rounded-2xl p-4 font-bold outline-none focus:ring-2 focus:ring-emerald-500`} />
+                    <input type="number" value={editingPlant.tempMin} onChange={e => setEditingPlant({ ...editingPlant, tempMin: +e.target.value })} className={`w-full ${inputClasses} rounded-2xl p-4 font-bold outline-none focus:ring-2 focus:ring-violet-500`} />
                   </div>
                   <div>
                     <span className={`text-[10px] font-bold ml-1 ${isDarkMode ? 'text-slate-500' : 'text-slate-400'}`}>Maximum</span>
-                    <input type="number" value={editingPlant.tempMax} onChange={e => setEditingPlant({ ...editingPlant, tempMax: +e.target.value })} className={`w-full ${inputClasses} rounded-2xl p-4 font-bold outline-none focus:ring-2 focus:ring-emerald-500`} />
+                    <input type="number" value={editingPlant.tempMax} onChange={e => setEditingPlant({ ...editingPlant, tempMax: +e.target.value })} className={`w-full ${inputClasses} rounded-2xl p-4 font-bold outline-none focus:ring-2 focus:ring-violet-500`} />
                   </div>
                 </div>
               </div>
@@ -2025,7 +2547,7 @@ const App: React.FC = () => {
                   >
                     <i className="fas fa-sun text-yellow-400 text-xs"></i>
                     <span className="text-[10px] font-black uppercase text-slate-400 tracking-widest">Lumière minimum (%)</span>
-                    <i className={`fas fa-circle-info text-[10px] transition-colors ${openTooltip === 'light' ? 'text-emerald-500' : 'text-slate-300'}`}></i>
+                    <i className={`fas fa-circle-info text-[10px] transition-colors ${openTooltip === 'light' ? 'text-violet-500' : 'text-slate-300'}`}></i>
                   </button>
                   {openTooltip === 'light' && (
                     <div className={`absolute left-0 top-full mt-2 z-10 w-72 p-3 rounded-xl text-xs shadow-xl border ${isDarkMode ? 'bg-slate-800 border-slate-700 text-slate-300' : 'bg-white border-slate-200 text-slate-600'}`}>
@@ -2033,7 +2555,7 @@ const App: React.FC = () => {
                     </div>
                   )}
                 </div>
-                <input type="number" min="0" max="100" value={editingPlant.lightMin} onChange={e => setEditingPlant({ ...editingPlant, lightMin: +e.target.value })} className={`w-full ${inputClasses} rounded-2xl p-4 font-bold outline-none focus:ring-2 focus:ring-emerald-500`} />
+                <input type="number" min="0" max="100" value={editingPlant.lightMin} onChange={e => setEditingPlant({ ...editingPlant, lightMin: +e.target.value })} className={`w-full ${inputClasses} rounded-2xl p-4 font-bold outline-none focus:ring-2 focus:ring-violet-500`} />
               </div>
 
               {/* pH */}
@@ -2048,7 +2570,7 @@ const App: React.FC = () => {
                   >
                     <i className="fas fa-flask text-violet-400 text-xs"></i>
                     <span className="text-[10px] font-black uppercase text-slate-400 tracking-widest">pH du sol</span>
-                    <i className={`fas fa-circle-info text-[10px] transition-colors ${openTooltip === 'ph' ? 'text-emerald-500' : 'text-slate-300'}`}></i>
+                    <i className={`fas fa-circle-info text-[10px] transition-colors ${openTooltip === 'ph' ? 'text-violet-500' : 'text-slate-300'}`}></i>
                   </button>
                   {openTooltip === 'ph' && (
                     <div className={`absolute left-0 top-full mt-2 z-10 w-72 p-3 rounded-xl text-xs shadow-xl border ${isDarkMode ? 'bg-slate-800 border-slate-700 text-slate-300' : 'bg-white border-slate-200 text-slate-600'}`}>
@@ -2059,11 +2581,11 @@ const App: React.FC = () => {
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <span className={`text-[10px] font-bold ml-1 ${isDarkMode ? 'text-slate-500' : 'text-slate-400'}`}>Minimum</span>
-                    <input type="number" step="0.1" min="0" max="14" value={editingPlant.phMin} onChange={e => setEditingPlant({ ...editingPlant, phMin: +e.target.value })} className={`w-full ${inputClasses} rounded-2xl p-4 font-bold outline-none focus:ring-2 focus:ring-emerald-500`} />
+                    <input type="number" step="0.1" min="0" max="14" value={editingPlant.phMin} onChange={e => setEditingPlant({ ...editingPlant, phMin: +e.target.value })} className={`w-full ${inputClasses} rounded-2xl p-4 font-bold outline-none focus:ring-2 focus:ring-violet-500`} />
                   </div>
                   <div>
                     <span className={`text-[10px] font-bold ml-1 ${isDarkMode ? 'text-slate-500' : 'text-slate-400'}`}>Maximum</span>
-                    <input type="number" step="0.1" min="0" max="14" value={editingPlant.phMax} onChange={e => setEditingPlant({ ...editingPlant, phMax: +e.target.value })} className={`w-full ${inputClasses} rounded-2xl p-4 font-bold outline-none focus:ring-2 focus:ring-emerald-500`} />
+                    <input type="number" step="0.1" min="0" max="14" value={editingPlant.phMax} onChange={e => setEditingPlant({ ...editingPlant, phMax: +e.target.value })} className={`w-full ${inputClasses} rounded-2xl p-4 font-bold outline-none focus:ring-2 focus:ring-violet-500`} />
                   </div>
                 </div>
               </div>
@@ -2075,7 +2597,7 @@ const App: React.FC = () => {
                   onChange={e => setEditingPlant({ ...editingPlant, notes: e.target.value })}
                   rows={3}
                   placeholder="Conseils de culture, particularités..."
-                  className={`w-full ${inputClasses} rounded-2xl p-4 font-bold outline-none focus:ring-2 focus:ring-emerald-500 resize-none`}
+                  className={`w-full ${inputClasses} rounded-2xl p-4 font-bold outline-none focus:ring-2 focus:ring-violet-500 resize-none`}
                 />
               </div>
             </div>
@@ -2089,7 +2611,7 @@ const App: React.FC = () => {
               </button>
               <button
                 onClick={() => { if (editingPlant.name.trim()) handlePlantSave(editingPlant); }}
-                className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white py-4 rounded-2xl font-black uppercase tracking-widest transition-all shadow-lg shadow-emerald-600/20 active:scale-95"
+                className="flex-1 bg-violet-600 hover:bg-violet-700 text-white py-4 rounded-2xl font-black uppercase tracking-widest transition-all shadow-lg shadow-violet-600/20 active:scale-95"
               >
                 Enregistrer
               </button>

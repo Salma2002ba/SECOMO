@@ -107,6 +107,7 @@ export interface Alert {
   message: string;
   type: AlertType;
   timestamp: string;
+  read?: boolean;
 }
 
 export interface WeatherData {

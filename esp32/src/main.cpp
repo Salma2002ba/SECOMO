@@ -1,5 +1,6 @@
 #include <Arduino.h>
 #include <ArduinoJson.h>
+#include <time.h>
 
 #include "config.h"
 #include "sensors.h"
@@ -12,6 +13,42 @@ static unsigned long lastSensorReadMs = 0;
 static unsigned long lastSendMs = 0;
 static unsigned long lastCommandPollMs = 0;
 static unsigned long lastWifiAttemptMs = 0;
+static bool ntpSynced = false;
+
+// --- NTP : synchronisation de l'heure réelle ---
+void syncNTP() {
+    configTime(3600, 3600, "pool.ntp.org", "time.google.com"); // UTC+1 + heure été
+    Serial.print("[NTP] Synchronisation...");
+    int tries = 0;
+    struct tm timeinfo;
+    while (!getLocalTime(&timeinfo) && tries++ < 20) {
+        delay(500);
+        Serial.print(".");
+    }
+    Serial.println();
+    if (tries < 20) {
+        ntpSynced = true;
+        char buf[32];
+        strftime(buf, sizeof(buf), "%Y-%m-%dT%H:%M:%SZ", &timeinfo);
+        Serial.printf("[NTP] Heure synchronisée : %s\n", buf);
+    } else {
+        Serial.println("[NTP] Échec de synchronisation");
+    }
+}
+
+// Retourne l'heure ISO 8601 courante (ou uptime si NTP non synchronisé)
+String getTimestamp() {
+    if (ntpSynced) {
+        struct tm timeinfo;
+        if (getLocalTime(&timeinfo)) {
+            char buf[32];
+            strftime(buf, sizeof(buf), "%Y-%m-%dT%H:%M:%SZ", &timeinfo);
+            return String(buf);
+        }
+    }
+    // Fallback : secondes depuis démarrage
+    return String("uptime:") + String(millis() / 1000);
+}
 
 // --- Dernières données capteurs ---
 static SensorData lastSensorData;
@@ -72,9 +109,15 @@ void processCommands(const String& json) {
             ledOff();
         }
         else if (strcmp(action, "pump_peristaltic_on") == 0) {
-            int duration = cmd["duration_sec"] | 10;
             pumpPeristalticOn();
             // Le watchdog coupera automatiquement après PERISTALTIC_MAX_DURATION_SEC
+        }
+        else if (strcmp(action, "cancel_irrigation") == 0) {
+            automationCancelIrrigation();
+        }
+        else if (strcmp(action, "set_mode") == 0) {
+            const char* mode = cmd["mode"] | "auto";
+            automationSetEnabled(strcmp(mode, "auto") == 0);
         }
         else if (strcmp(action, "reboot") == 0) {
             Serial.println("[MAIN] Redémarrage demandé par le backend...");
@@ -115,6 +158,7 @@ void setup() {
     if (networkConnect()) {
         degradedMode = false;
         digitalWrite(PIN_STATUS_LED, HIGH); // LED fixe = connecté
+        syncNTP(); // Synchronisation heure réseau
     } else {
         degradedMode = true;
         Serial.println("[MAIN] Mode dégradé activé (pas de WiFi)");

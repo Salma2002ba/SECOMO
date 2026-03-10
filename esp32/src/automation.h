@@ -32,4 +32,13 @@ bool automationIsIrrigationBlocked();
 // Lance un cycle d'arrosage manuel (commande backend)
 void automationStartIrrigation(int durationSec);
 
+// Annule un arrosage en cours immédiatement
+void automationCancelIrrigation();
+
+// Active ou désactive l'automatisation locale
+void automationSetEnabled(bool enabled);
+
+// Retourne vrai si l'automatisation est active
+bool automationIsEnabled();
+
 #endif // AUTOMATION_H

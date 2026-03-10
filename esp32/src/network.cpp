@@ -1,9 +1,11 @@
 #include "network.h"
 #include "config.h"
+#include "automation.h"
 
 #include <WiFi.h>
 #include <HTTPClient.h>
 #include <ArduinoJson.h>
+#include <time.h>
 
 static int httpFailureCount = 0;
 
@@ -72,9 +74,18 @@ bool networkSendSensorData(const SensorData& sensors, const ActuatorState& actua
 
     // Construire le JSON
     JsonDocument doc;
+    // Timestamp ISO 8601 via NTP (ou uptime si non synchronisé)
+    struct tm timeinfo;
+    char tsBuf[32];
+    if (getLocalTime(&timeinfo)) {
+        strftime(tsBuf, sizeof(tsBuf), "%Y-%m-%dT%H:%M:%SZ", &timeinfo);
+    } else {
+        snprintf(tsBuf, sizeof(tsBuf), "uptime:%lu", millis() / 1000);
+    }
+
     doc["device_id"] = DEVICE_ID;
     doc["plant_id"] = PLANT_ID;
-    doc["timestamp"] = (unsigned long)(millis() / 1000); // Remplacer par NTP si disponible
+    doc["timestamp"] = tsBuf;
 
     // Calculer la moyenne humidité sol
     float soilAvg = -1.0;
@@ -106,6 +117,8 @@ bool networkSendSensorData(const SensorData& sensors, const ActuatorState& actua
     actuatorsObj["valve_b"] = actuators.valveB;
     actuatorsObj["fan"] = actuators.fan;
     actuatorsObj["led"] = actuators.led;
+
+    doc["automation_enabled"] = automationIsEnabled();
 
     String payload;
     serializeJson(doc, payload);

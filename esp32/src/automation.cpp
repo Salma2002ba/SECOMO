@@ -10,6 +10,7 @@ static unsigned long lastIrrigationEndMs = 0;
 static bool irrigationInProgress = false;
 static unsigned long irrigationStartMs = 0;
 static int irrigationDurationMs = 0;
+static bool automationEnabled = true; // true = mode AUTO, false = mode MANUEL
 
 // ============================================================
 // Initialisation
@@ -69,11 +70,30 @@ static void checkIrrigationProgress() {
 // Évaluation des règles
 // ============================================================
 
+void automationSetEnabled(bool enabled) {
+    automationEnabled = enabled;
+    Serial.printf("[AUTO] Mode automatisation : %s\n", enabled ? "AUTO" : "MANUEL");
+    if (!enabled) {
+        // Passage en mode manuel : éteindre ventilateur et LED
+        // (l'arrosage en cours se termine normalement)
+        ActuatorState state = actuatorsGetState();
+        if (state.fan) { fanOff(); Serial.println("[AUTO] Ventilateur OFF (passage manuel)"); }
+        if (state.led) { ledOff(); Serial.println("[AUTO] LED OFF (passage manuel)"); }
+    }
+}
+
+bool automationIsEnabled() {
+    return automationEnabled;
+}
+
 bool automationEvaluate(const SensorData& data) {
     bool actionTriggered = false;
 
-    // Gérer un arrosage en cours
+    // Gérer un arrosage en cours (même en mode manuel, on laisse finir)
     checkIrrigationProgress();
+
+    // Sortir immédiatement si mode manuel
+    if (!automationEnabled) return false;
 
     // --- Règle 1 : Arrosage automatique ---
     if (!irrigationInProgress) {
@@ -187,4 +207,17 @@ bool automationSetThreshold(const char* param, float value) {
 
 AutomationThresholds automationGetThresholds() {
     return thresholds;
+}
+
+void automationCancelIrrigation() {
+    if (!irrigationInProgress) {
+        Serial.println("[AUTO] Pas d'arrosage en cours à annuler");
+        return;
+    }
+    pumpMainOff();
+    delay(200);
+    valveAOff();
+    irrigationInProgress = false;
+    lastIrrigationEndMs = millis();
+    Serial.println("[AUTO] Arrosage annulé");
 }
