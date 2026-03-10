@@ -257,9 +257,55 @@ const translations = {
   sim_mode: { FR: '⚡ Mode simulation', EN: '⚡ Simulation mode' },
   sim_offline: { FR: 'Backend hors ligne', EN: 'Backend offline' },
 
+  // Dashboard extras
+  dash_slider_drag: { FR: 'Glisser pour ajuster', EN: 'Drag to adjust' },
+  dash_manual_controls: { FR: 'Contrôles Manuels', EN: 'Manual Controls' },
+  dash_cultivated_plant: { FR: 'Plante Cultivée', EN: 'Cultivated Plant' },
+
+  // Profile extras
+  prof_email_readonly: { FR: 'Adresse Email (Lecture seule)', EN: 'Email Address (Read only)' },
+
+  // Config extras
+  cfg_plants_no_bac: { FR: 'Plantes sans bac assigné', EN: 'Plants without assigned tank' },
+  cfg_grid_help: { FR: 'Survolez un bac pour accéder à son icône Paramètres — automatisation (arrosage, ventilation, éclairage), taille du bac, fréquence de mesure.', EN: 'Hover over a tank to access its Settings icon — automation (watering, ventilation, lighting), tank size, sampling frequency.' },
+  cfg_new_bac_title: { FR: 'Nouveau bac', EN: 'New tank' },
+  cfg_physical_linked: { FR: 'Bac physique lié', EN: 'Linked physical tank' },
+  qr_link_label: { FR: 'Lier au bac physique (ESP32)', EN: 'Link to physical tank (ESP32)' },
+  qr_scan_btn: { FR: 'Scanner QR Code', EN: 'Scan QR Code' },
+  qr_manual_btn: { FR: 'Saisie manuelle', EN: 'Manual entry' },
+  qr_optional: { FR: 'Optionnel — vous pouvez lier le bac plus tard.', EN: 'Optional — you can link the tank later.' },
+  qr_scan_title: { FR: "Scanner le QR Code de l'ESP32", EN: 'Scan the ESP32 QR Code' },
+  qr_manual_title: { FR: "Code physique de l'ESP32", EN: 'ESP32 physical code' },
+  qr_switch_manual: { FR: 'Passer à la saisie manuelle →', EN: 'Switch to manual entry →' },
+  qr_api_hint: { FR: "Trouvez la clé API dans la config de votre ESP32 ou sur l'étiquette du bac.", EN: 'Find the API key in your ESP32 config or on the tank label.' },
+  qr_no_support: { FR: 'Votre navigateur ne supporte pas le scan QR. Utilisez la saisie manuelle.', EN: 'Your browser does not support QR scanning. Use manual entry.' },
+  qr_camera_denied: { FR: 'Accès à la caméra refusé. Utilisez la saisie manuelle.', EN: 'Camera access denied. Use manual entry.' },
+  cfg_create_bac: { FR: 'Créer le bac', EN: 'Create tank' },
+  cfg_bac_swap_hint: { FR: 'Cliquez sur un autre bac pour interchanger leurs plantes', EN: 'Click another tank to swap their plants' },
+
+  // Alerts extras
+  alert_clear_all: { FR: 'Tout effacer', EN: 'Clear all' },
+  alert_see_dashboard: { FR: 'Voir le dashboard', EN: 'View dashboard' },
+
+  // Plant form
+  plant_form_humidity: { FR: 'Humidité du sol (%)', EN: 'Soil humidity (%)' },
+  plant_form_humidity_tip: { FR: "Le taux d'eau dans la terre. 0% = terre complètement sèche, 100% = saturée d'eau. La plupart des plantes poussent bien entre 40% et 70%.", EN: 'Water content in the soil. 0% = completely dry, 100% = saturated. Most plants grow well between 40% and 70%.' },
+  plant_form_temp: { FR: 'Température (°C)', EN: 'Temperature (°C)' },
+  plant_form_temp_tip: { FR: "Plage de température tolérée. En dessous du min ou au-dessus du max, la croissance ralentit ou la plante souffre. Intérieur classique : 18-25°C.", EN: 'Tolerated temperature range. Below min or above max, growth slows or the plant suffers. Typical indoor range: 18-25°C.' },
+  plant_form_light: { FR: 'Lumière minimum (%)', EN: 'Minimum light (%)' },
+  plant_form_light_tip: { FR: "Intensité lumineuse minimale. 30-40% = mi-ombre (salades, menthe), 60-80% = plein soleil (tomates, piments). En dessous, les LEDs horticoles s'activeront automatiquement.", EN: 'Minimum light intensity. 30-40% = partial shade (lettuce, mint), 60-80% = full sun (tomatoes, peppers). Below this, horticultural LEDs will activate automatically.' },
+  plant_form_ph: { FR: 'pH du sol', EN: 'Soil pH' },
+  plant_form_ph_tip: { FR: "Acidité du sol, de 0 (très acide) à 14 (très basique). Potager classique : 6.0-7.0 (légèrement acide à neutre). Fraises et myrtilles préfèrent un sol plus acide (5.0-6.0).", EN: 'Soil acidity, from 0 (very acidic) to 14 (very alkaline). Typical garden: 6.0-7.0 (slightly acidic to neutral). Strawberries and blueberries prefer more acidic soil (5.0-6.0).' },
+  plant_unlinked: { FR: 'Non assignée à un bac', EN: 'Not assigned to a tank' },
+  plant_delete_desc: { FR: 'sera supprimée et désassociée de tous les bacs.', EN: 'will be deleted and unlinked from all tanks.' },
+  plant_catalog_no_result: { FR: 'Aucun résultat. Vous pouvez remplir les champs manuellement ci-dessous.', EN: 'No results. You can fill in the fields manually below.' },
+  plant_catalog_hint: { FR: 'Tapez au moins 2 caractères pour rechercher. Les valeurs seront pré-remplies automatiquement.', EN: 'Type at least 2 characters to search. Values will be pre-filled automatically.' },
+
   // General
   gen_min: { FR: 'Min', EN: 'Min' },
   gen_max: { FR: 'Max', EN: 'Max' },
+  gen_minimum: { FR: 'Minimum', EN: 'Minimum' },
+  gen_maximum: { FR: 'Maximum', EN: 'Maximum' },
   gen_save: { FR: 'Enregistrer', EN: 'Save' },
   gen_cancel: { FR: 'Annuler', EN: 'Cancel' },
   gen_delete: { FR: 'Supprimer', EN: 'Delete' },

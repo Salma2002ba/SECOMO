@@ -121,7 +121,7 @@ const SwipeSlider: React.FC<{
         <div className={`h-full transition-none ${color.includes('blue') ? 'bg-blue-600' : color.includes('amber') ? 'bg-amber-500' : 'bg-violet-600'}`} style={{ width: `${pct}%` }} />
         <div className="absolute inset-0 flex items-center justify-center gap-2">
           <i className="fas fa-arrows-left-right text-white/60 text-xs"></i>
-          <span className="text-xs font-bold text-white/70">Glisser pour ajuster</span>
+          <span className="text-xs font-bold text-white/70">{t('dash_slider_drag', lang)}</span>
         </div>
       </div>
       <div className="flex justify-between text-[10px] text-slate-400 px-1">
@@ -1386,7 +1386,7 @@ const App: React.FC = () => {
                   <div className={`${cardClasses} rounded-[32px] border shadow-sm overflow-hidden`}>
                     <div className="px-8 py-5 border-b flex items-center gap-2 ${isDarkMode ? 'border-slate-800' : 'border-slate-100'}">
                       <i className="fas fa-hand-pointer text-slate-400"></i>
-                      <h3 className={`text-base font-black ${isDarkMode ? 'text-slate-100' : 'text-slate-800'}`}>Contrôles Manuels</h3>
+                      <h3 className={`text-base font-black ${isDarkMode ? 'text-slate-100' : 'text-slate-800'}`}>{t('dash_manual_controls', lang)}</h3>
                     </div>
                     <div className="px-8 py-6">
                       <div className="grid grid-cols-3 gap-6">
@@ -1491,7 +1491,7 @@ const App: React.FC = () => {
               <div className="space-y-8">
                 <WeatherWidget isDark={isDarkMode} />
                 <div className={`${cardClasses} p-8 rounded-[32px] border shadow-sm`}>
-                  <h3 className={`text-lg font-black mb-6 ${isDarkMode ? 'text-slate-100' : 'text-slate-800'}`}>Plante Cultivée</h3>
+                  <h3 className={`text-lg font-black mb-6 ${isDarkMode ? 'text-slate-100' : 'text-slate-800'}`}>{t('dash_cultivated_plant', lang)}</h3>
                   {currentPlant ? (
                     <div className="flex items-center gap-4 mb-6">
                       <div className="w-16 h-16 bg-violet-500/10 rounded-2xl flex items-center justify-center text-violet-500 shadow-inner">
@@ -1585,7 +1585,7 @@ const App: React.FC = () => {
                       />
                     </div>
                     <div className="space-y-2 lg:col-span-2">
-                      <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest ml-1">Adresse Email (Lecture seule)</label>
+                      <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest ml-1">{t('prof_email_readonly', lang)}</label>
                       <input 
                         type="email" 
                         readOnly 
@@ -1884,7 +1884,7 @@ const App: React.FC = () => {
                         {/* Badges des stations liées */}
                         {isUnlinked ? (
                           <p className="text-xs font-bold text-rose-400 flex items-center gap-1.5 mb-4">
-                            <i className="fas fa-unlink"></i> Non assignée à un bac
+                            <i className="fas fa-unlink"></i> {t('plant_unlinked', lang)}
                           </p>
                         ) : (
                           <div className="flex flex-wrap gap-2 mb-4">
@@ -1969,7 +1969,7 @@ const App: React.FC = () => {
                 <div className={`p-5 rounded-2xl border-2 border-rose-400/40 ${isDarkMode ? 'bg-rose-500/10' : 'bg-rose-50'} flex items-start gap-3`}>
                   <i className="fas fa-circle-exclamation text-rose-500 mt-0.5"></i>
                   <div>
-                    <p className={`text-sm font-bold ${isDarkMode ? 'text-rose-300' : 'text-rose-700'}`}>Plantes sans bac assigné</p>
+                    <p className={`text-sm font-bold ${isDarkMode ? 'text-rose-300' : 'text-rose-700'}`}>{t('cfg_plants_no_bac', lang)}</p>
                     <p className="text-xs text-rose-400 mt-1">
                       {plantsWithoutBac.map(p => p.name).join(', ')} — Placez-les dans un bac via la grille ci-dessous.
                     </p>
@@ -2025,13 +2025,13 @@ const App: React.FC = () => {
                           <div className={`flex items-center gap-2.5 px-4 py-3 rounded-2xl text-xs font-medium ${isDarkMode ? 'bg-blue-500/10 text-blue-300' : 'bg-blue-50 text-blue-600'}`}>
                             <i className="fas fa-circle-info flex-shrink-0"></i>
                             <span>
-                              Survolez un bac pour accéder à son icône <i className="fas fa-gear mx-1"></i><strong>Paramètres</strong> — automatisation (arrosage, ventilation, éclairage), taille du bac, fréquence de mesure.
+                              {t('cfg_grid_help', lang)}
                             </span>
                           </div>
                           {swapSourceBacId && (
                             <p className="text-xs font-bold text-amber-500 flex items-center gap-2">
                               <i className="fas fa-arrows-rotate"></i>
-                              Bac sélectionné : <span className="text-amber-400">{devices.find(d => d.id === swapSourceBacId)?.name}</span> — Cliquez sur un autre bac pour interchanger leurs plantes
+                              {lang === 'FR' ? 'Bac sélectionné' : 'Tank selected'} : <span className="text-amber-400">{devices.find(d => d.id === swapSourceBacId)?.name}</span> — {t('cfg_bac_swap_hint', lang)}
                               <button onClick={() => setSwapSourceBacId(null)} className="ml-2 text-slate-400 hover:text-slate-200"><i className="fas fa-times"></i></button>
                             </p>
                           )}
@@ -2273,7 +2273,7 @@ const App: React.FC = () => {
                         onClick={() => setAlerts([])}
                         className={`px-4 py-2 rounded-2xl text-xs font-bold uppercase tracking-wider transition-all ${isDarkMode ? 'bg-slate-800 text-rose-400 hover:bg-rose-500/20' : 'bg-slate-100 text-rose-500 hover:bg-rose-50'}`}
                       >
-                        <i className="fas fa-trash mr-1.5"></i>Tout effacer
+                        <i className="fas fa-trash mr-1.5"></i>{t('alert_clear_all', lang)}
                       </button>
                     </div>
                   )}
@@ -2364,7 +2364,7 @@ const App: React.FC = () => {
                                           <div className="flex items-center justify-between mt-2">
                                             <p className="text-[10px] text-slate-400">{new Date(alert.timestamp).toLocaleString()}</p>
                                             <span className={`text-[10px] font-bold opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-1 ${isDarkMode ? 'text-violet-400' : 'text-violet-600'}`}>
-                                              <i className="fas fa-arrow-right"></i>Voir le dashboard
+                                              <i className="fas fa-arrow-right"></i>{t('alert_see_dashboard', lang)}
                                             </span>
                                           </div>
                                         </div>
@@ -2403,7 +2403,7 @@ const App: React.FC = () => {
               <div className="text-center space-y-3">
                 <div className="w-16 h-16 bg-rose-500/10 rounded-full flex items-center justify-center mx-auto"><i className="fas fa-trash text-rose-500 text-2xl"></i></div>
                 <h3 className={`text-xl font-black ${isDarkMode ? 'text-slate-100' : 'text-slate-800'}`}>{t('plant_delete_confirm', lang)}</h3>
-                <p className="text-sm text-slate-400">"{plant?.name}" sera supprimée et désassociée de tous les bacs.</p>
+                <p className="text-sm text-slate-400">"{plant?.name && translatePlantName(plant.name, lang)}" {t('plant_delete_desc', lang)}</p>
               </div>
               <div className="flex gap-4">
                 <button onClick={() => setDeletingPlantId(null)} className={`flex-1 py-4 rounded-2xl font-black uppercase tracking-widest ${isDarkMode ? 'bg-slate-800 text-slate-300 hover:bg-slate-700' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}>{t('plant_cancel', lang)}</button>
@@ -2520,7 +2520,7 @@ const App: React.FC = () => {
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 backdrop-blur-sm" onClick={() => { setEditingBac(null); setNewBacName(''); setNewBacPhysicalId(''); }}>
           <div className={`w-full max-w-md mx-4 max-h-[90vh] overflow-y-auto ${cardClasses} rounded-[32px] border shadow-2xl p-10 space-y-6`} onClick={e => e.stopPropagation()}>
             <h3 className={`text-xl font-black ${isDarkMode ? 'text-slate-100' : 'text-slate-800'}`}>
-              <i className="fas fa-box mr-2 text-violet-500"></i>Nouveau bac
+              <i className="fas fa-box mr-2 text-violet-500"></i>{t('cfg_new_bac_title', lang)}
             </h3>
             <div className="space-y-2">
               <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest ml-1">{t('cfg_bac_name', lang)}</label>
@@ -2536,13 +2536,13 @@ const App: React.FC = () => {
               <div className={`p-4 rounded-2xl flex items-center gap-3 ${isDarkMode ? 'bg-violet-500/10' : 'bg-violet-50'}`}>
                 <i className="fas fa-link text-violet-500"></i>
                 <div className="flex-1 min-w-0">
-                  <p className="text-xs font-bold text-violet-500">Bac physique lié</p>
+                  <p className="text-xs font-bold text-violet-500">{t('cfg_physical_linked', lang)}</p>
                   <p className={`text-[10px] font-mono truncate ${isDarkMode ? 'text-slate-300' : 'text-slate-600'}`}>{newBacPhysicalId}</p>
                 </div>
                 <button onClick={() => setNewBacPhysicalId('')} className="text-slate-400 hover:text-rose-400 text-xs"><i className="fas fa-times"></i></button>
               </div>
             ) : (
-              <QRScanner isDark={isDarkMode} onCode={code => setNewBacPhysicalId(code)} />
+              <QRScanner isDark={isDarkMode} lang={lang} onCode={code => setNewBacPhysicalId(code)} />
             )}
 
             <div className="flex gap-4 pt-2">
@@ -2556,7 +2556,7 @@ const App: React.FC = () => {
                 disabled={!newBacName.trim()}
                 className="flex-1 bg-violet-600 hover:bg-violet-700 disabled:opacity-40 text-white py-4 rounded-2xl font-black uppercase tracking-widest shadow-lg shadow-violet-600/20"
               >
-                Créer le bac
+                {t('cfg_create_bac', lang)}
               </button>
             </div>
           </div>
@@ -2616,12 +2616,12 @@ const App: React.FC = () => {
               )}
               {catalogSearch.length >= 2 && catalogResults.length === 0 && !catalogLoading && (
                 <p className={`text-xs ml-1 ${isDarkMode ? 'text-slate-500' : 'text-slate-400'}`}>
-                  Aucun résultat. Vous pouvez remplir les champs manuellement ci-dessous.
+                  {t('plant_catalog_no_result', lang)}
                 </p>
               )}
               {catalogSearch.length < 2 && (
                 <p className={`text-xs italic ml-1 ${isDarkMode ? 'text-slate-500' : 'text-slate-400'}`}>
-                  Tapez au moins 2 caractères pour rechercher. Les valeurs seront pré-remplies automatiquement.
+                  {t('plant_catalog_hint', lang)}
                 </p>
               )}
             </div>
@@ -2649,22 +2649,22 @@ const App: React.FC = () => {
                     onMouseLeave={() => setOpenTooltip(prev => prev === 'humidity' ? null : prev)}
                   >
                     <i className="fas fa-tint text-blue-400 text-xs"></i>
-                    <span className="text-[10px] font-black uppercase text-slate-400 tracking-widest">Humidité du sol (%)</span>
+                    <span className="text-[10px] font-black uppercase text-slate-400 tracking-widest">{t('plant_form_humidity', lang)}</span>
                     <i className={`fas fa-circle-info text-[10px] transition-colors ${openTooltip === 'humidity' ? 'text-violet-500' : 'text-slate-300'}`}></i>
                   </button>
                   {openTooltip === 'humidity' && (
                     <div className={`absolute left-0 top-full mt-2 z-10 w-72 p-3 rounded-xl text-xs shadow-xl border ${isDarkMode ? 'bg-slate-800 border-slate-700 text-slate-300' : 'bg-white border-slate-200 text-slate-600'}`}>
-                      Le taux d'eau dans la terre. <strong>0%</strong> = terre complètement sèche, <strong>100%</strong> = saturée d'eau. La plupart des plantes poussent bien entre <strong>40% et 70%</strong>.
+                      {t('plant_form_humidity_tip', lang)}
                     </div>
                   )}
                 </div>
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <span className={`text-[10px] font-bold ml-1 ${isDarkMode ? 'text-slate-500' : 'text-slate-400'}`}>Minimum</span>
+                    <span className={`text-[10px] font-bold ml-1 ${isDarkMode ? 'text-slate-500' : 'text-slate-400'}`}>{t('gen_minimum', lang)}</span>
                     <input type="number" min="0" max="100" value={editingPlant.humidityMin} onChange={e => setEditingPlant({ ...editingPlant, humidityMin: +e.target.value })} className={`w-full ${inputClasses} rounded-2xl p-4 font-bold outline-none focus:ring-2 focus:ring-violet-500`} />
                   </div>
                   <div>
-                    <span className={`text-[10px] font-bold ml-1 ${isDarkMode ? 'text-slate-500' : 'text-slate-400'}`}>Maximum</span>
+                    <span className={`text-[10px] font-bold ml-1 ${isDarkMode ? 'text-slate-500' : 'text-slate-400'}`}>{t('gen_maximum', lang)}</span>
                     <input type="number" min="0" max="100" value={editingPlant.humidityMax} onChange={e => setEditingPlant({ ...editingPlant, humidityMax: +e.target.value })} className={`w-full ${inputClasses} rounded-2xl p-4 font-bold outline-none focus:ring-2 focus:ring-violet-500`} />
                   </div>
                 </div>
@@ -2681,22 +2681,22 @@ const App: React.FC = () => {
                     onMouseLeave={() => setOpenTooltip(prev => prev === 'temp' ? null : prev)}
                   >
                     <i className="fas fa-thermometer-half text-amber-400 text-xs"></i>
-                    <span className="text-[10px] font-black uppercase text-slate-400 tracking-widest">Température (°C)</span>
+                    <span className="text-[10px] font-black uppercase text-slate-400 tracking-widest">{t('plant_form_temp', lang)}</span>
                     <i className={`fas fa-circle-info text-[10px] transition-colors ${openTooltip === 'temp' ? 'text-violet-500' : 'text-slate-300'}`}></i>
                   </button>
                   {openTooltip === 'temp' && (
                     <div className={`absolute left-0 top-full mt-2 z-10 w-72 p-3 rounded-xl text-xs shadow-xl border ${isDarkMode ? 'bg-slate-800 border-slate-700 text-slate-300' : 'bg-white border-slate-200 text-slate-600'}`}>
-                      Plage de température tolérée. En dessous du min ou au-dessus du max, la croissance ralentit ou la plante souffre. <strong>Intérieur classique : 18-25°C</strong>.
+                      {t('plant_form_temp_tip', lang)}
                     </div>
                   )}
                 </div>
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <span className={`text-[10px] font-bold ml-1 ${isDarkMode ? 'text-slate-500' : 'text-slate-400'}`}>Minimum</span>
+                    <span className={`text-[10px] font-bold ml-1 ${isDarkMode ? 'text-slate-500' : 'text-slate-400'}`}>{t('gen_minimum', lang)}</span>
                     <input type="number" value={editingPlant.tempMin} onChange={e => setEditingPlant({ ...editingPlant, tempMin: +e.target.value })} className={`w-full ${inputClasses} rounded-2xl p-4 font-bold outline-none focus:ring-2 focus:ring-violet-500`} />
                   </div>
                   <div>
-                    <span className={`text-[10px] font-bold ml-1 ${isDarkMode ? 'text-slate-500' : 'text-slate-400'}`}>Maximum</span>
+                    <span className={`text-[10px] font-bold ml-1 ${isDarkMode ? 'text-slate-500' : 'text-slate-400'}`}>{t('gen_maximum', lang)}</span>
                     <input type="number" value={editingPlant.tempMax} onChange={e => setEditingPlant({ ...editingPlant, tempMax: +e.target.value })} className={`w-full ${inputClasses} rounded-2xl p-4 font-bold outline-none focus:ring-2 focus:ring-violet-500`} />
                   </div>
                 </div>
@@ -2713,12 +2713,12 @@ const App: React.FC = () => {
                     onMouseLeave={() => setOpenTooltip(prev => prev === 'light' ? null : prev)}
                   >
                     <i className="fas fa-sun text-yellow-400 text-xs"></i>
-                    <span className="text-[10px] font-black uppercase text-slate-400 tracking-widest">Lumière minimum (%)</span>
+                    <span className="text-[10px] font-black uppercase text-slate-400 tracking-widest">{t('plant_form_light', lang)}</span>
                     <i className={`fas fa-circle-info text-[10px] transition-colors ${openTooltip === 'light' ? 'text-violet-500' : 'text-slate-300'}`}></i>
                   </button>
                   {openTooltip === 'light' && (
                     <div className={`absolute left-0 top-full mt-2 z-10 w-72 p-3 rounded-xl text-xs shadow-xl border ${isDarkMode ? 'bg-slate-800 border-slate-700 text-slate-300' : 'bg-white border-slate-200 text-slate-600'}`}>
-                      Intensité lumineuse minimale. <strong>30-40%</strong> = mi-ombre (salades, menthe), <strong>60-80%</strong> = plein soleil (tomates, piments). En dessous, les LEDs horticoles s'activeront automatiquement.
+                      {t('plant_form_light_tip', lang)}
                     </div>
                   )}
                 </div>
@@ -2736,22 +2736,22 @@ const App: React.FC = () => {
                     onMouseLeave={() => setOpenTooltip(prev => prev === 'ph' ? null : prev)}
                   >
                     <i className="fas fa-flask text-violet-400 text-xs"></i>
-                    <span className="text-[10px] font-black uppercase text-slate-400 tracking-widest">pH du sol</span>
+                    <span className="text-[10px] font-black uppercase text-slate-400 tracking-widest">{t('plant_form_ph', lang)}</span>
                     <i className={`fas fa-circle-info text-[10px] transition-colors ${openTooltip === 'ph' ? 'text-violet-500' : 'text-slate-300'}`}></i>
                   </button>
                   {openTooltip === 'ph' && (
                     <div className={`absolute left-0 top-full mt-2 z-10 w-72 p-3 rounded-xl text-xs shadow-xl border ${isDarkMode ? 'bg-slate-800 border-slate-700 text-slate-300' : 'bg-white border-slate-200 text-slate-600'}`}>
-                      Acidité du sol, de 0 (très acide) à 14 (très basique). <strong>Potager classique : 6.0 - 7.0</strong> (légèrement acide à neutre). Fraises et myrtilles préfèrent un sol plus acide (5.0 - 6.0).
+                      {t('plant_form_ph_tip', lang)}
                     </div>
                   )}
                 </div>
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <span className={`text-[10px] font-bold ml-1 ${isDarkMode ? 'text-slate-500' : 'text-slate-400'}`}>Minimum</span>
+                    <span className={`text-[10px] font-bold ml-1 ${isDarkMode ? 'text-slate-500' : 'text-slate-400'}`}>{t('gen_minimum', lang)}</span>
                     <input type="number" step="0.1" min="0" max="14" value={editingPlant.phMin} onChange={e => setEditingPlant({ ...editingPlant, phMin: +e.target.value })} className={`w-full ${inputClasses} rounded-2xl p-4 font-bold outline-none focus:ring-2 focus:ring-violet-500`} />
                   </div>
                   <div>
-                    <span className={`text-[10px] font-bold ml-1 ${isDarkMode ? 'text-slate-500' : 'text-slate-400'}`}>Maximum</span>
+                    <span className={`text-[10px] font-bold ml-1 ${isDarkMode ? 'text-slate-500' : 'text-slate-400'}`}>{t('gen_maximum', lang)}</span>
                     <input type="number" step="0.1" min="0" max="14" value={editingPlant.phMax} onChange={e => setEditingPlant({ ...editingPlant, phMax: +e.target.value })} className={`w-full ${inputClasses} rounded-2xl p-4 font-bold outline-none focus:ring-2 focus:ring-violet-500`} />
                   </div>
                 </div>
@@ -2763,7 +2763,7 @@ const App: React.FC = () => {
                   value={editingPlant.notes}
                   onChange={e => setEditingPlant({ ...editingPlant, notes: e.target.value })}
                   rows={3}
-                  placeholder="Conseils de culture, particularités..."
+                  placeholder={t('plant_notes_placeholder', lang)}
                   className={`w-full ${inputClasses} rounded-2xl p-4 font-bold outline-none focus:ring-2 focus:ring-violet-500 resize-none`}
                 />
               </div>

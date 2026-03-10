@@ -1,11 +1,13 @@
 import React, { useEffect, useRef, useState } from 'react';
+import { t, type Lang } from '../i18n';
 
 interface QRScannerProps {
   onCode: (code: string) => void;
   isDark?: boolean;
+  lang?: Lang;
 }
 
-const QRScanner: React.FC<QRScannerProps> = ({ onCode, isDark }) => {
+const QRScanner: React.FC<QRScannerProps> = ({ onCode, isDark, lang = 'FR' }) => {
   const videoRef = useRef<HTMLVideoElement>(null);
   const [mode, setMode] = useState<'choice' | 'qr' | 'manual'>('choice');
   const [manualCode, setManualCode] = useState('');
@@ -41,7 +43,7 @@ const QRScanner: React.FC<QRScannerProps> = ({ onCode, isDark }) => {
         setScanning(true);
 
         if (!('BarcodeDetector' in window)) {
-          setScanError('Votre navigateur ne supporte pas le scan QR. Utilisez la saisie manuelle.');
+          setScanError(t('qr_no_support', lang));
           stopCamera();
           return;
         }
@@ -66,7 +68,7 @@ const QRScanner: React.FC<QRScannerProps> = ({ onCode, isDark }) => {
 
         animRef.current = requestAnimationFrame(scan);
       } catch (e: any) {
-        setScanError('Accès à la caméra refusé. Utilisez la saisie manuelle.');
+        setScanError(t('qr_camera_denied', lang));
         stopCamera();
       }
     };
@@ -79,7 +81,7 @@ const QRScanner: React.FC<QRScannerProps> = ({ onCode, isDark }) => {
     return (
       <div className="space-y-3">
         <p className="text-[10px] font-black uppercase text-slate-400 tracking-widest ml-1">
-          Lier au bac physique (ESP32)
+          {t('qr_link_label', lang)}
         </p>
         <div className="grid grid-cols-2 gap-3">
           <button
@@ -87,18 +89,18 @@ const QRScanner: React.FC<QRScannerProps> = ({ onCode, isDark }) => {
             className={`p-4 rounded-2xl border-2 flex flex-col items-center gap-2 transition-all hover:border-emerald-500 ${isDark ? 'border-slate-700 bg-slate-800 hover:bg-emerald-500/10' : 'border-slate-200 bg-slate-50 hover:bg-emerald-50'}`}
           >
             <i className="fas fa-qrcode text-2xl text-emerald-500"></i>
-            <span className={`text-xs font-bold ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>Scanner QR Code</span>
+            <span className={`text-xs font-bold ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>{t('qr_scan_btn', lang)}</span>
           </button>
           <button
             onClick={() => setMode('manual')}
             className={`p-4 rounded-2xl border-2 flex flex-col items-center gap-2 transition-all hover:border-emerald-500 ${isDark ? 'border-slate-700 bg-slate-800 hover:bg-emerald-500/10' : 'border-slate-200 bg-slate-50 hover:bg-emerald-50'}`}
           >
             <i className="fas fa-keyboard text-2xl text-emerald-500"></i>
-            <span className={`text-xs font-bold ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>Saisie manuelle</span>
+            <span className={`text-xs font-bold ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>{t('qr_manual_btn', lang)}</span>
           </button>
         </div>
         <p className={`text-[10px] italic ml-1 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
-          Optionnel — vous pouvez lier le bac plus tard.
+          {t('qr_optional', lang)}
         </p>
       </div>
     );
@@ -109,10 +111,10 @@ const QRScanner: React.FC<QRScannerProps> = ({ onCode, isDark }) => {
       <div className="space-y-3">
         <div className="flex items-center justify-between">
           <p className="text-[10px] font-black uppercase text-slate-400 tracking-widest ml-1">
-            Scanner le QR Code de l'ESP32
+            {t('qr_scan_title', lang)}
           </p>
           <button onClick={() => setMode('choice')} className="text-xs text-slate-400 hover:text-slate-200 flex items-center gap-1">
-            <i className="fas fa-arrow-left text-[10px]"></i> Retour
+            <i className="fas fa-arrow-left text-[10px]"></i> {t('gen_back', lang)}
           </button>
         </div>
         <div className={`relative rounded-2xl overflow-hidden aspect-square max-h-56 flex items-center justify-center ${isDark ? 'bg-slate-800' : 'bg-slate-100'}`}>
@@ -132,7 +134,7 @@ const QRScanner: React.FC<QRScannerProps> = ({ onCode, isDark }) => {
           <div className="space-y-2">
             <p className="text-xs text-rose-400 flex items-center gap-2"><i className="fas fa-exclamation-circle"></i>{scanError}</p>
             <button onClick={() => setMode('manual')} className="text-xs text-emerald-500 font-bold hover:underline">
-              Passer à la saisie manuelle →
+              {t('qr_switch_manual', lang)}
             </button>
           </div>
         )}
@@ -145,10 +147,10 @@ const QRScanner: React.FC<QRScannerProps> = ({ onCode, isDark }) => {
     <div className="space-y-3">
       <div className="flex items-center justify-between">
         <p className="text-[10px] font-black uppercase text-slate-400 tracking-widest ml-1">
-          Code physique de l'ESP32
+          {t('qr_manual_title', lang)}
         </p>
         <button onClick={() => setMode('choice')} className="text-xs text-slate-400 hover:text-slate-200 flex items-center gap-1">
-          <i className="fas fa-arrow-left text-[10px]"></i> Retour
+          <i className="fas fa-arrow-left text-[10px]"></i> {t('gen_back', lang)}
         </button>
       </div>
       <div className="flex gap-2">
@@ -156,7 +158,7 @@ const QRScanner: React.FC<QRScannerProps> = ({ onCode, isDark }) => {
           type="text"
           value={manualCode}
           onChange={e => setManualCode(e.target.value)}
-          placeholder="Ex: a3f8c1d2e5... (clé API ESP32)"
+          placeholder="Ex: a3f8c1d2e5..."
           className={`flex-1 rounded-2xl p-4 text-sm font-mono font-bold outline-none focus:ring-2 focus:ring-emerald-500 ${isDark ? 'bg-slate-800 border-slate-700 text-slate-100' : 'bg-slate-50 text-slate-800'}`}
         />
         <button
@@ -168,7 +170,7 @@ const QRScanner: React.FC<QRScannerProps> = ({ onCode, isDark }) => {
         </button>
       </div>
       <p className={`text-[10px] italic ml-1 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
-        Trouvez la clé API dans la config de votre ESP32 ou sur l'étiquette du bac.
+        {t('qr_api_hint', lang)}
       </p>
     </div>
   );
