@@ -215,6 +215,10 @@ const translations = {
   ctrl_light_turn_on: { FR: 'Allumer', EN: 'Turn on' },
 
   // Config modal
+  cfg_grid_size: { FR: 'Taille de la grille', EN: 'Grid size' },
+  cfg_grid_rows: { FR: 'Lignes', EN: 'Rows' },
+  cfg_grid_cols: { FR: 'Colonnes', EN: 'Columns' },
+  cfg_grid_bacs_warning: { FR: 'Des bacs sont hors grille — agrandissez la grille pour les voir.', EN: 'Some tanks are outside the grid — increase the grid size to see them.' },
   cfg_edit_station: { FR: 'Modifier la station', EN: 'Edit station' },
   cfg_new_station_title: { FR: 'Nouvelle station', EN: 'New station' },
   cfg_station_no_name: { FR: 'Station sans nom', EN: 'Unnamed station' },
@@ -296,7 +300,7 @@ const translations = {
   plant_form_light_tip: { FR: "Intensité lumineuse minimale. 30-40% = mi-ombre (salades, menthe), 60-80% = plein soleil (tomates, piments). En dessous, les LEDs horticoles s'activeront automatiquement.", EN: 'Minimum light intensity. 30-40% = partial shade (lettuce, mint), 60-80% = full sun (tomatoes, peppers). Below this, horticultural LEDs will activate automatically.' },
   plant_form_ph: { FR: 'pH du sol', EN: 'Soil pH' },
   plant_form_ph_tip: { FR: "Acidité du sol, de 0 (très acide) à 14 (très basique). Potager classique : 6.0-7.0 (légèrement acide à neutre). Fraises et myrtilles préfèrent un sol plus acide (5.0-6.0).", EN: 'Soil acidity, from 0 (very acidic) to 14 (very alkaline). Typical garden: 6.0-7.0 (slightly acidic to neutral). Strawberries and blueberries prefer more acidic soil (5.0-6.0).' },
-  plant_unlinked: { FR: 'Non assignée à un bac', EN: 'Not assigned to a tank' },
+  plant_not_assigned: { FR: 'Non assignée à un bac', EN: 'Not assigned to a tank' },
   plant_delete_desc: { FR: 'sera supprimée et désassociée de tous les bacs.', EN: 'will be deleted and unlinked from all tanks.' },
   plant_catalog_no_result: { FR: 'Aucun résultat. Vous pouvez remplir les champs manuellement ci-dessous.', EN: 'No results. You can fill in the fields manually below.' },
   plant_catalog_hint: { FR: 'Tapez au moins 2 caractères pour rechercher. Les valeurs seront pré-remplies automatiquement.', EN: 'Type at least 2 characters to search. Values will be pre-filled automatically.' },
@@ -316,6 +320,19 @@ const translations = {
   dash_auto_active: { FR: 'Mode AUTO actif — cliquer pour passer en manuel', EN: 'AUTO mode active — click to switch to manual' },
   cfg_bac_settings: { FR: 'Paramètres du bac', EN: 'Tank settings' },
   alert_delete: { FR: 'Supprimer cette alerte', EN: 'Delete this alert' },
+
+  // Water tank card
+  tank_label:       { FR: 'Réservoir', EN: 'Water Tank' },
+  tank_refill_hint: { FR: 'Remplir le réservoir si niveau < 30%', EN: 'Refill tank when level < 30%' },
+
+  // Manual controls labels (previously hardcoded)
+  ctrl_watering_label:    { FR: 'Arroser', EN: 'Water' },
+  ctrl_ventilation_label: { FR: 'Ventilation', EN: 'Ventilation' },
+  ctrl_target_temp:       { FR: '°C cible', EN: '°C target' },
+
+  // Auto mode info
+  dash_auto_fan_speed: { FR: 'Vitesse ventil.', EN: 'Fan speed' },
+  prof_save_info: { FR: 'Enregistrer les modifications', EN: 'Save changes' },
 } as const;
 
 export type TranslationKey = keyof typeof translations;
@@ -342,7 +359,7 @@ export function translatePlantName(name: string, lang: Lang): string {
 // Messages dynamiques d'alertes
 // ---------------------------------------------------------------------------
 export function alertMsg(
-  category: 'humidity_low' | 'humidity_high' | 'temp_low' | 'temp_high' | 'ph_low' | 'ph_high' | 'light_low',
+  category: 'humidity_low' | 'humidity_high' | 'temp_low' | 'temp_high' | 'ph_low' | 'ph_high' | 'light_low' | 'battery_low' | 'water_tank_low',
   values: { val: number; threshold: number; plantName: string },
   lang: Lang,
 ): string {
@@ -351,23 +368,27 @@ export function alertMsg(
   const thr = values.threshold;
   if (lang === 'EN') {
     switch (category) {
-      case 'humidity_low':  return `Low humidity: ${v.toFixed(0)}% (min ${thr}% for ${name})`;
-      case 'humidity_high': return `High humidity: ${v.toFixed(0)}% (max ${thr}% for ${name})`;
-      case 'temp_low':      return `Low temperature: ${v.toFixed(1)}°C (min ${thr}°C for ${name})`;
-      case 'temp_high':     return `High temperature: ${v.toFixed(1)}°C (max ${thr}°C for ${name})`;
-      case 'ph_low':        return `Low soil pH: ${v.toFixed(1)} (min ${thr} for ${name})`;
-      case 'ph_high':       return `High soil pH: ${v.toFixed(1)} (max ${thr} for ${name})`;
-      case 'light_low':     return `Insufficient light: ${v.toFixed(0)}% (min ${thr}% for ${name}). Consider activating the LEDs.`;
+      case 'humidity_low':   return `Low humidity: ${v.toFixed(0)}% (min ${thr}% for ${name})`;
+      case 'humidity_high':  return `High humidity: ${v.toFixed(0)}% (max ${thr}% for ${name})`;
+      case 'temp_low':       return `Low temperature: ${v.toFixed(1)}°C (min ${thr}°C for ${name})`;
+      case 'temp_high':      return `High temperature: ${v.toFixed(1)}°C (max ${thr}°C for ${name})`;
+      case 'ph_low':         return `Low soil pH: ${v.toFixed(1)} (min ${thr} for ${name})`;
+      case 'ph_high':        return `High soil pH: ${v.toFixed(1)} (max ${thr} for ${name})`;
+      case 'light_low':      return `Insufficient light: ${v.toFixed(0)}% (min ${thr}% for ${name}). Consider activating the LEDs.`;
+      case 'battery_low':    return `Low battery: ${v.toFixed(0)}% — replace soon.`;
+      case 'water_tank_low': return `Water tank low: ${v.toFixed(0)}% remaining — refill the tank.`;
     }
   }
   switch (category) {
-    case 'humidity_low':  return `Humidité basse : ${v.toFixed(0)}% (min ${thr}% pour ${name})`;
-    case 'humidity_high': return `Humidité élevée : ${v.toFixed(0)}% (max ${thr}% pour ${name})`;
-    case 'temp_low':      return `Température basse : ${v.toFixed(1)}°C (min ${thr}°C pour ${name})`;
-    case 'temp_high':     return `Température élevée : ${v.toFixed(1)}°C (max ${thr}°C pour ${name})`;
-    case 'ph_low':        return `pH sol bas : ${v.toFixed(1)} (min ${thr} pour ${name})`;
-    case 'ph_high':       return `pH sol élevé : ${v.toFixed(1)} (max ${thr} pour ${name})`;
-    case 'light_low':     return `Lumière insuffisante : ${v.toFixed(0)}% (min ${thr}% pour ${name}). Pensez à activer les LEDs.`;
+    case 'humidity_low':   return `Humidité basse : ${v.toFixed(0)}% (min ${thr}% pour ${name})`;
+    case 'humidity_high':  return `Humidité élevée : ${v.toFixed(0)}% (max ${thr}% pour ${name})`;
+    case 'temp_low':       return `Température basse : ${v.toFixed(1)}°C (min ${thr}°C pour ${name})`;
+    case 'temp_high':      return `Température élevée : ${v.toFixed(1)}°C (max ${thr}°C pour ${name})`;
+    case 'ph_low':         return `pH sol bas : ${v.toFixed(1)} (min ${thr} pour ${name})`;
+    case 'ph_high':        return `pH sol élevé : ${v.toFixed(1)} (max ${thr} pour ${name})`;
+    case 'light_low':      return `Lumière insuffisante : ${v.toFixed(0)}% (min ${thr}% pour ${name}). Pensez à activer les LEDs.`;
+    case 'battery_low':    return `Batterie faible : ${v.toFixed(0)}% — remplacez-la rapidement.`;
+    case 'water_tank_low': return `Réservoir bas : ${v.toFixed(0)}% restant — remplissez le réservoir.`;
   }
 }
 
@@ -375,26 +396,44 @@ export function alertMsg(
 // Messages dynamiques de recommandations
 // ---------------------------------------------------------------------------
 export function recMsg(
-  id: 'r1' | 'r2' | 'r3' | 'r4' | 'r5' | 'r6',
+  id: 'r1' | 'r2' | 'r3' | 'r4' | 'r5' | 'r6' | 'r7' | 'r8' | 'r9' | 'r10' | 'r11' | 'r12' | 'r13' | 'r14' | 'r15',
   val: number,
   lang: Lang,
 ): string {
   if (lang === 'EN') {
     switch (id) {
-      case 'r1': return `Critical humidity (${val.toFixed(0)}%): use the Water button.`;
-      case 'r2': return `Soil too wet (${val.toFixed(0)}%): pause watering.`;
-      case 'r3': return `Temperature too high (${val.toFixed(1)}°C): activate ventilation.`;
-      case 'r4': return `Temperature too low (${val.toFixed(1)}°C): protect the plant from cold.`;
-      case 'r5': return `Insufficient light (${val.toFixed(0)}%): activate LED lighting.`;
-      case 'r6': return `Insufficient light (${val.toFixed(0)}%) even with automatic lighting. Consider moving the tank to a brighter area.`;
+      case 'r1':  return `Critical humidity (${val.toFixed(0)}%): use the Water button.`;
+      case 'r2':  return `Soil too wet (${val.toFixed(0)}%): pause watering.`;
+      case 'r3':  return `Temperature too high (${val.toFixed(1)}°C): activate ventilation.`;
+      case 'r4':  return `Temperature too low (${val.toFixed(1)}°C): protect the plant from cold.`;
+      case 'r5':  return `Insufficient light (${val.toFixed(0)}%): activate LED lighting.`;
+      case 'r6':  return `Insufficient light (${val.toFixed(0)}%) even with automatic lighting. Consider moving the tank to a brighter area.`;
+      case 'r7':  return `Soil pH too low (${val.toFixed(1)}): add crushed limestone or dolomite to raise the pH.`;
+      case 'r8':  return `Soil pH too high (${val.toFixed(1)}): add sulfur or organic compost to lower the pH.`;
+      case 'r9':  return `Soil pH critical (${val.toFixed(1)}): very acid soil inhibits nutrient uptake. Urgent correction needed.`;
+      case 'r10': return `Soil pH critical (${val.toFixed(1)}): very alkaline soil causes iron and manganese deficiency.`;
+      case 'r11': return `Battery low (${val.toFixed(0)}%): plan to replace it soon.`;
+      case 'r12': return `Battery very low (${val.toFixed(0)}%): replace immediately to avoid sensor loss.`;
+      case 'r13': return `Battery critical (${val.toFixed(0)}%): sensors may stop at any moment.`;
+      case 'r14': return `Water tank low (${val.toFixed(0)}%): refill soon to ensure auto watering.`;
+      case 'r15': return `Water tank almost empty (${val.toFixed(0)}%): auto watering limited. Refill urgently.`;
     }
   }
   switch (id) {
-    case 'r1': return `Humidité critique (${val.toFixed(0)}%) : utilisez le bouton Arroser.`;
-    case 'r2': return `Sol trop humide (${val.toFixed(0)}%) : suspendez l'arrosage.`;
-    case 'r3': return `Température trop élevée (${val.toFixed(1)}°C) : activez la ventilation.`;
-    case 'r4': return `Température trop basse (${val.toFixed(1)}°C) : protégez la plante du froid.`;
-    case 'r5': return `Lumière insuffisante (${val.toFixed(0)}%) : activez l'éclairage LED.`;
-    case 'r6': return `Lumière insuffisante (${val.toFixed(0)}%) même avec éclairage automatique. Envisagez de déplacer le bac vers une zone plus lumineuse.`;
+    case 'r1':  return `Humidité critique (${val.toFixed(0)}%) : utilisez le bouton Arroser.`;
+    case 'r2':  return `Sol trop humide (${val.toFixed(0)}%) : suspendez l'arrosage.`;
+    case 'r3':  return `Température trop élevée (${val.toFixed(1)}°C) : activez la ventilation.`;
+    case 'r4':  return `Température trop basse (${val.toFixed(1)}°C) : protégez la plante du froid.`;
+    case 'r5':  return `Lumière insuffisante (${val.toFixed(0)}%) : activez l'éclairage LED.`;
+    case 'r6':  return `Lumière insuffisante (${val.toFixed(0)}%) même avec éclairage automatique. Envisagez de déplacer le bac vers une zone plus lumineuse.`;
+    case 'r7':  return `pH sol trop bas (${val.toFixed(1)}) : ajoutez du calcaire broyé ou de la dolomite pour remonter le pH.`;
+    case 'r8':  return `pH sol trop élevé (${val.toFixed(1)}) : ajoutez du soufre ou du compost organique pour abaisser le pH.`;
+    case 'r9':  return `pH sol critique (${val.toFixed(1)}) : sol très acide, l'absorption des nutriments est bloquée. Correction urgente.`;
+    case 'r10': return `pH sol critique (${val.toFixed(1)}) : sol très alcalin, risque de carence en fer et manganèse.`;
+    case 'r11': return `Batterie faible (${val.toFixed(0)}%) : prévoyez un remplacement prochainement.`;
+    case 'r12': return `Batterie très faible (${val.toFixed(0)}%) : remplacez-la immédiatement pour éviter une perte de données capteurs.`;
+    case 'r13': return `Batterie critique (${val.toFixed(0)}%) : les capteurs peuvent s'arrêter à tout moment.`;
+    case 'r14': return `Réservoir bas (${val.toFixed(0)}%) : remplissez-le prochainement pour assurer l'arrosage automatique.`;
+    case 'r15': return `Réservoir quasi vide (${val.toFixed(0)}%) : arrosage automatique limité. Remplissage urgent.`;
   }
 }

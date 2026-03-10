@@ -29,6 +29,10 @@ export interface DeviceConfig {
   autoLighting: boolean;
   samplingFrequencySec: number;
   phCalibrationOffset: number;
+  tankCapacityLiters: number;
+  flowRateLitersPerMin: number;
+  soilVolumeLiters: number;
+  volumeM3: number;
 }
 
 export interface Station {
@@ -36,6 +40,8 @@ export interface Station {
   name: string;
   locationLabel: string;
   createdAt: string;
+  gridRows: number;
+  gridCols: number;
 }
 
 export interface Device {
@@ -50,6 +56,7 @@ export interface Device {
   physicalId?: string;
   isLightOn: boolean;
   isFanOn: boolean;
+  fanSpeed: number;
   createdAt: string;
   isWatering: boolean;
   lastWatering?: string;
@@ -65,6 +72,7 @@ export interface SensorReading {
   light: number;
   soilPh: number;
   batteryLevel: number;
+  waterTankLevel: number;
 }
 
 export enum WateringMode {
@@ -96,7 +104,7 @@ export interface PlantProfile {
 
 export type AlertType = 'info' | 'warning' | 'critical';
 
-export type AlertCategory = 'humidity' | 'temperature' | 'ph' | 'light';
+export type AlertCategory = 'humidity' | 'temperature' | 'ph' | 'light' | 'battery' | 'water_tank';
 
 export interface Alert {
   id: string;

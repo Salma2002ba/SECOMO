@@ -19,7 +19,7 @@ interface HistoryChartProps {
   lang?: Lang;
 }
 
-const HistoryChart: React.FC<HistoryChartProps> = ({ data, isDark, lang = 'FR' }) => {
+const HistoryChart: React.FC<HistoryChartProps> = ({ data, isDark, lang = 'FR' as Lang }) => {
   const formattedData = data.map(d => ({
     ...d,
     time: new Date(d.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })

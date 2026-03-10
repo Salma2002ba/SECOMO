@@ -46,6 +46,8 @@ export const INITIAL_STATIONS: Station[] = [
     name: 'Station Principale',
     locationLabel: 'Jardin',
     createdAt: new Date().toISOString(),
+    gridRows: 2,
+    gridCols: 2,
   }
 ];
 
@@ -61,6 +63,7 @@ export const INITIAL_DEVICES: Device[] = [
     bacPosition: { row: 0, col: 0 },
     isLightOn: false,
     isFanOn: false,
+    fanSpeed: 0,
     createdAt: new Date().toISOString(),
     isWatering: false,
     automationEnabled: true,
@@ -68,7 +71,11 @@ export const INITIAL_DEVICES: Device[] = [
       autoVentilation: true,
       autoLighting: true,
       samplingFrequencySec: 10,
-      phCalibrationOffset: 0.1
+      phCalibrationOffset: 0.1,
+      tankCapacityLiters: 20,
+      flowRateLitersPerMin: 0.5,
+      soilVolumeLiters: 15,
+      volumeM3: 0.5,
     }
   },
   {
@@ -82,6 +89,7 @@ export const INITIAL_DEVICES: Device[] = [
     bacPosition: { row: 0, col: 1 },
     isLightOn: false,
     isFanOn: false,
+    fanSpeed: 0,
     createdAt: new Date().toISOString(),
     isWatering: false,
     automationEnabled: false,
@@ -89,7 +97,11 @@ export const INITIAL_DEVICES: Device[] = [
       autoVentilation: false,
       autoLighting: false,
       samplingFrequencySec: 30,
-      phCalibrationOffset: 0
+      phCalibrationOffset: 0,
+      tankCapacityLiters: 10,
+      flowRateLitersPerMin: 0.3,
+      soilVolumeLiters: 8,
+      volumeM3: 0.2,
     }
   }
 ];

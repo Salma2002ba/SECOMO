@@ -10,7 +10,7 @@ interface AuthProps {
   lang?: Lang;
 }
 
-const Auth: React.FC<AuthProps> = ({ type, onBack, onSwitch, onSuccess, lang = 'FR' }) => {
+const Auth: React.FC<AuthProps> = ({ type, onBack, onSwitch, onSuccess, lang = 'FR' as Lang }) => {
   const [email, setEmail] = React.useState('');
   const [password, setPassword] = React.useState('');
   const [firstName, setFirstName] = React.useState('');

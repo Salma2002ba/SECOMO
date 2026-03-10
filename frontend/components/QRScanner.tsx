@@ -7,7 +7,7 @@ interface QRScannerProps {
   lang?: Lang;
 }
 
-const QRScanner: React.FC<QRScannerProps> = ({ onCode, isDark, lang = 'FR' }) => {
+const QRScanner: React.FC<QRScannerProps> = ({ onCode, isDark, lang = 'FR' as Lang }) => {
   const videoRef = useRef<HTMLVideoElement>(null);
   const [mode, setMode] = useState<'choice' | 'qr' | 'manual'>('choice');
   const [manualCode, setManualCode] = useState('');

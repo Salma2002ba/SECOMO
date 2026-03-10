@@ -15,7 +15,7 @@ interface SensorCardProps {
   lang?: Lang;
 }
 
-const SensorCard: React.FC<SensorCardProps> = ({ label, value, unit, status, targetRange, icon, hidden, isDark, lang = 'FR' }) => {
+const SensorCard: React.FC<SensorCardProps> = ({ label, value, unit, status, targetRange, icon, hidden, isDark, lang = 'FR' as Lang }) => {
   if (hidden) return null;
 
   const statusStyles = {
