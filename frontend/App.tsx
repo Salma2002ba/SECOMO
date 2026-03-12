@@ -120,7 +120,7 @@ const SwipeSlider: React.FC<{
         onMouseDown={e => { e.preventDefault(); draggingRef.current = true; startXRef.current = e.clientX; startValueRef.current = value; }}
         onTouchStart={e => { draggingRef.current = true; startXRef.current = e.touches[0].clientX; startValueRef.current = value; }}
       >
-        <div className={`h-full transition-none ${color.includes('blue') ? 'bg-blue-600' : color.includes('amber') ? 'bg-amber-500' : 'bg-violet-600'}`} style={{ width: `${pct}%` }} />
+        <div className={`h-full transition-none ${color.includes('blue') ? 'bg-blue-600' : color.includes('amber') ? 'bg-amber-500' : 'bg-green-600'}`} style={{ width: `${pct}%` }} />
         <div className="absolute inset-0 flex items-center justify-center gap-2">
           <i className="fas fa-arrows-left-right text-white/60 text-xs"></i>
           <span className="text-xs font-bold text-white/70">{t('dash_slider_drag', lang)}</span>
@@ -1377,7 +1377,7 @@ const App: React.FC = () => {
       {/* Botanical Sidebar */}
       <aside className={`w-24 lg:w-72 border-r flex flex-col fixed inset-y-0 z-50 transition-colors ${sidebarClasses}`}>
         <div onClick={() => setView('dashboard')} className="p-8 flex items-center gap-4 cursor-pointer group">
-          <div className="w-12 h-12 bg-violet-600 rounded-2xl flex items-center justify-center text-white shadow-lg shadow-violet-200 group-hover:scale-105 transition-transform">
+          <div className="w-12 h-12 bg-green-600 rounded-2xl flex items-center justify-center text-white shadow-lg shadow-green-200 group-hover:scale-105 transition-transform">
             <i className="fas fa-leaf text-2xl"></i>
           </div>
           <span className={`text-2xl font-black hidden lg:block tracking-tighter transition-colors ${isDarkMode ? 'text-slate-100' : 'text-slate-800'}`}>SECOMO</span>
@@ -1395,7 +1395,7 @@ const App: React.FC = () => {
             <button 
               key={item.id}
               onClick={() => setView(item.id as any)}
-              className={`w-full flex items-center gap-4 p-4 rounded-2xl transition-all relative ${view === item.id ? 'bg-violet-600/10 text-violet-500 font-bold' : 'text-slate-400 hover:bg-violet-600/5'}`}
+              className={`w-full flex items-center gap-4 p-4 rounded-2xl transition-all relative ${view === item.id ? 'bg-green-600/10 text-green-500 font-bold' : 'text-slate-400 hover:bg-green-600/5'}`}
             >
               <i className={`fas ${item.icon} w-6 text-center text-xl`}></i>
               <span className="hidden lg:block">{item.label}</span>
@@ -1408,7 +1408,7 @@ const App: React.FC = () => {
 
         <div className={`p-6 border-t ${isDarkMode ? 'border-slate-800' : 'border-slate-100'}`}>
           <div onClick={() => setView('profil')} className={`flex items-center gap-4 p-4 rounded-2xl cursor-pointer transition-colors ${isDarkMode ? 'hover:bg-slate-800' : 'hover:bg-slate-50'} mb-4`}>
-            <div className="w-10 h-10 bg-violet-100 rounded-full flex items-center justify-center text-violet-600 font-bold">
+            <div className="w-10 h-10 bg-green-100 rounded-full flex items-center justify-center text-green-600 font-bold">
               {currentUser.firstName[0]}{currentUser.lastName[0]}
             </div>
             <div className="hidden lg:block truncate">
@@ -1430,7 +1430,7 @@ const App: React.FC = () => {
           <div className="flex-shrink-0">
             <h2 className={`text-3xl font-black capitalize tracking-tight ${isDarkMode ? 'text-slate-100' : 'text-slate-800'}`}>{view === 'profil' ? t('prof_title', lang) : view}</h2>
             <p className="text-slate-400 text-sm font-medium">
-              {t('header_station', lang)}: <span className="text-violet-500">{stations.find(s => s.id === selectedStationId)?.name || '—'}</span>
+              {t('header_station', lang)}: <span className="text-green-500">{stations.find(s => s.id === selectedStationId)?.name || '—'}</span>
             </p>
           </div>
 
@@ -1451,7 +1451,7 @@ const App: React.FC = () => {
                 }}
                 className={`relative cursor-pointer rounded-2xl p-0.5 transition-all duration-300 shadow-md select-none w-44 ${
                   selectedDevice.automationEnabled
-                    ? 'bg-violet-500 shadow-violet-500/30'
+                    ? 'bg-green-500 shadow-green-500/30'
                     : (isDarkMode ? 'bg-slate-700' : 'bg-slate-200')
                 }`}
               >
@@ -1466,7 +1466,7 @@ const App: React.FC = () => {
                     <span className="text-xs uppercase tracking-wide">{t('dash_manual_mode', lang)}</span>
                   </div>
                   <div className={`py-2 px-3 flex items-center justify-center gap-1.5 transition-colors duration-300 ${
-                    selectedDevice.automationEnabled ? 'text-violet-700 font-black' : 'text-white/50 font-bold'
+                    selectedDevice.automationEnabled ? 'text-green-700 font-black' : 'text-white/50 font-bold'
                   }`}>
                     <i className="fas fa-robot text-xs"></i>
                     <span className="text-xs uppercase tracking-wide">{t('dash_auto_mode', lang)}</span>
@@ -1486,7 +1486,7 @@ const App: React.FC = () => {
               <select
                 value={selectedStationId || ''}
                 onChange={(e) => setSelectedStationId(e.target.value)}
-                className={`${inputClasses} border-none rounded-2xl px-6 py-3 text-sm font-bold focus:ring-2 focus:ring-violet-500 outline-none cursor-pointer`}
+                className={`${inputClasses} border-none rounded-2xl px-6 py-3 text-sm font-bold focus:ring-2 focus:ring-green-500 outline-none cursor-pointer`}
               >
                 {stations.map(station => (
                   <option key={station.id} value={station.id}>
@@ -1496,7 +1496,7 @@ const App: React.FC = () => {
               </select>
             )}
             {view === 'profil' && statusMsg && (
-              <span className={`px-4 py-2 rounded-xl text-xs font-bold animate-fade-in ${statusMsg.type === 'success' ? 'bg-violet-500/10 text-violet-500' : 'bg-rose-500/10 text-rose-500'}`}>
+              <span className={`px-4 py-2 rounded-xl text-xs font-bold animate-fade-in ${statusMsg.type === 'success' ? 'bg-green-500/10 text-green-500' : 'bg-rose-500/10 text-rose-500'}`}>
                 {statusMsg.text}
               </span>
             )}
@@ -1523,7 +1523,7 @@ const App: React.FC = () => {
                           onClick={() => setSelectedDeviceId(bac.id)}
                           className={`px-4 py-2 rounded-xl text-xs font-bold transition-all ${
                             selectedDeviceId === bac.id
-                              ? 'bg-violet-600 text-white shadow-lg shadow-violet-600/20'
+                              ? 'bg-green-600 text-white shadow-lg shadow-green-600/20'
                               : (isDarkMode ? 'bg-slate-800 text-slate-400 hover:bg-slate-700' : 'bg-slate-100 text-slate-500 hover:bg-slate-200')
                           }`}
                         >
@@ -1534,7 +1534,7 @@ const App: React.FC = () => {
                         onClick={handleRefresh}
                         disabled={isRefreshing}
                         title={t('gen_refresh', lang)}
-                        className={`ml-auto px-3 py-2 rounded-xl text-xs font-bold transition-all disabled:opacity-50 ${isDarkMode ? 'bg-slate-800 text-slate-400 hover:bg-slate-700 hover:text-violet-400' : 'bg-slate-100 text-slate-500 hover:bg-slate-200 hover:text-violet-600'}`}
+                        className={`ml-auto px-3 py-2 rounded-xl text-xs font-bold transition-all disabled:opacity-50 ${isDarkMode ? 'bg-slate-800 text-slate-400 hover:bg-slate-700 hover:text-green-400' : 'bg-slate-100 text-slate-500 hover:bg-slate-200 hover:text-green-600'}`}
                       >
                         <i className={`fas fa-rotate-right ${isRefreshing ? 'animate-spin' : ''}`}></i>
                       </button>
@@ -1673,7 +1673,7 @@ const App: React.FC = () => {
                   <h3 className={`text-lg font-black mb-6 ${isDarkMode ? 'text-slate-100' : 'text-slate-800'}`}>{t('dash_cultivated_plant', lang)}</h3>
                   {currentPlant ? (
                     <div className="flex items-center gap-4 mb-6">
-                      <div className="w-16 h-16 bg-violet-500/10 rounded-2xl flex items-center justify-center text-violet-500 shadow-inner">
+                      <div className="w-16 h-16 bg-green-500/10 rounded-2xl flex items-center justify-center text-green-500 shadow-inner">
                         <i className="fas fa-seedling text-3xl"></i>
                       </div>
                       <div>
@@ -1689,7 +1689,7 @@ const App: React.FC = () => {
                       <p className="text-sm text-slate-400">{t('plant_no_assigned', lang)}</p>
                     </div>
                   )}
-                  <button onClick={() => setView('plantes')} className="w-full p-4 border-2 border-violet-500/20 hover:border-violet-500 hover:text-violet-500 rounded-2xl text-xs font-black uppercase tracking-widest transition-all">
+                  <button onClick={() => setView('plantes')} className="w-full p-4 border-2 border-green-500/20 hover:border-green-500 hover:text-green-500 rounded-2xl text-xs font-black uppercase tracking-widest transition-all">
                     {currentPlant ? t('plant_edit', lang) : t('rec_assign_plant', lang)}
                   </button>
                 </div>
@@ -1732,10 +1732,10 @@ const App: React.FC = () => {
                     )}
                     <button
                       onClick={() => setDevices(prev => prev.map(d => d.id === selectedDevice.id ? { ...d, automationEnabled: false } : d))}
-                      className={`w-full px-5 py-3.5 rounded-2xl border flex items-center justify-center gap-2 transition-colors ${isDarkMode ? 'bg-violet-500/10 border-violet-500/30 hover:bg-violet-500/20' : 'bg-violet-50 border-violet-200 hover:bg-violet-100'}`}
+                      className={`w-full px-5 py-3.5 rounded-2xl border flex items-center justify-center gap-2 transition-colors ${isDarkMode ? 'bg-green-500/10 border-green-500/30 hover:bg-green-500/20' : 'bg-green-50 border-green-200 hover:bg-green-100'}`}
                     >
-                      <i className="fas fa-lock text-violet-500 text-xs"></i>
-                      <span className="text-xs font-bold text-violet-600">{t('dash_auto_active', lang)}</span>
+                      <i className="fas fa-lock text-green-500 text-xs"></i>
+                      <span className="text-xs font-bold text-green-600">{t('dash_auto_active', lang)}</span>
                     </button>
                   </div>
                 )}
@@ -1749,7 +1749,7 @@ const App: React.FC = () => {
               <div className="lg:col-span-2 space-y-8">
                 <section className={`${cardClasses} p-10 rounded-[40px] border shadow-sm space-y-8`}>
                   <div className="flex items-center gap-4">
-                     <div className="w-16 h-16 bg-violet-600 rounded-[20px] flex items-center justify-center text-white text-3xl font-black shadow-xl shadow-violet-600/20">
+                     <div className="w-16 h-16 bg-green-600 rounded-[20px] flex items-center justify-center text-white text-3xl font-black shadow-xl shadow-green-600/20">
                        {currentUser.firstName[0]}
                      </div>
                      <div>
@@ -1765,7 +1765,7 @@ const App: React.FC = () => {
                         type="text" 
                         value={profileForm.firstName} 
                         onChange={e => setProfileForm({...profileForm, firstName: e.target.value})}
-                        className={`w-full ${inputClasses} rounded-2xl p-4 font-bold outline-none focus:ring-2 focus:ring-violet-500 transition-all`} 
+                        className={`w-full ${inputClasses} rounded-2xl p-4 font-bold outline-none focus:ring-2 focus:ring-green-500 transition-all`} 
                       />
                     </div>
                     <div className="space-y-2">
@@ -1774,7 +1774,7 @@ const App: React.FC = () => {
                         type="text" 
                         value={profileForm.lastName} 
                         onChange={e => setProfileForm({...profileForm, lastName: e.target.value})}
-                        className={`w-full ${inputClasses} rounded-2xl p-4 font-bold outline-none focus:ring-2 focus:ring-violet-500 transition-all`} 
+                        className={`w-full ${inputClasses} rounded-2xl p-4 font-bold outline-none focus:ring-2 focus:ring-green-500 transition-all`} 
                       />
                     </div>
                     <div className="space-y-2 lg:col-span-2">
@@ -1790,7 +1790,7 @@ const App: React.FC = () => {
                   <div className="flex justify-end pt-4">
                     <button 
                       onClick={() => updateProfile({ firstName: profileForm.firstName, lastName: profileForm.lastName })}
-                      className="bg-violet-600 hover:bg-violet-700 text-white px-8 py-4 rounded-2xl font-black uppercase tracking-widest transition-all shadow-lg shadow-violet-600/20 active:scale-95"
+                      className="bg-green-600 hover:bg-green-700 text-white px-8 py-4 rounded-2xl font-black uppercase tracking-widest transition-all shadow-lg shadow-green-600/20 active:scale-95"
                     >
                       {t('prof_save_info', lang)}
                     </button>
@@ -1807,7 +1807,7 @@ const App: React.FC = () => {
                         value={passwordForm.current}
                         onChange={e => setPasswordForm({...passwordForm, current: e.target.value})}
                         placeholder="••••••••"
-                        className={`w-full ${inputClasses} rounded-2xl p-4 font-bold outline-none focus:ring-2 focus:ring-violet-500 transition-all`} 
+                        className={`w-full ${inputClasses} rounded-2xl p-4 font-bold outline-none focus:ring-2 focus:ring-green-500 transition-all`} 
                       />
                     </div>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -1818,7 +1818,7 @@ const App: React.FC = () => {
                           value={passwordForm.next}
                           onChange={e => setPasswordForm({...passwordForm, next: e.target.value})}
                           placeholder="••••••••"
-                          className={`w-full ${inputClasses} rounded-2xl p-4 font-bold outline-none focus:ring-2 focus:ring-violet-500 transition-all`} 
+                          className={`w-full ${inputClasses} rounded-2xl p-4 font-bold outline-none focus:ring-2 focus:ring-green-500 transition-all`} 
                         />
                       </div>
                       <div className="space-y-2">
@@ -1828,7 +1828,7 @@ const App: React.FC = () => {
                           value={passwordForm.confirm}
                           onChange={e => setPasswordForm({...passwordForm, confirm: e.target.value})}
                           placeholder="••••••••"
-                          className={`w-full ${inputClasses} rounded-2xl p-4 font-bold outline-none focus:ring-2 focus:ring-violet-500 transition-all`} 
+                          className={`w-full ${inputClasses} rounded-2xl p-4 font-bold outline-none focus:ring-2 focus:ring-green-500 transition-all`} 
                         />
                       </div>
                     </div>
@@ -1851,23 +1851,23 @@ const App: React.FC = () => {
                   <div className="space-y-4">
                     <button 
                       onClick={() => updateProfile({ theme: 'light' })}
-                      className={`w-full p-4 rounded-2xl flex items-center justify-between border-2 transition-all ${currentUser.theme === 'light' ? 'border-violet-500 bg-violet-500/10' : 'border-transparent bg-slate-100/50'}`}
+                      className={`w-full p-4 rounded-2xl flex items-center justify-between border-2 transition-all ${currentUser.theme === 'light' ? 'border-green-500 bg-green-500/10' : 'border-transparent bg-slate-100/50'}`}
                     >
                       <div className="flex items-center gap-4">
-                        <i className={`fas fa-sun ${currentUser.theme === 'light' ? 'text-violet-500' : 'text-slate-400'}`}></i>
-                        <span className={`font-bold ${currentUser.theme === 'light' ? 'text-violet-600' : 'text-slate-500'}`}>{t('prof_theme_light_label', lang)}</span>
+                        <i className={`fas fa-sun ${currentUser.theme === 'light' ? 'text-green-500' : 'text-slate-400'}`}></i>
+                        <span className={`font-bold ${currentUser.theme === 'light' ? 'text-green-600' : 'text-slate-500'}`}>{t('prof_theme_light_label', lang)}</span>
                       </div>
-                      {currentUser.theme === 'light' && <i className="fas fa-check-circle text-violet-500"></i>}
+                      {currentUser.theme === 'light' && <i className="fas fa-check-circle text-green-500"></i>}
                     </button>
                     <button 
                       onClick={() => updateProfile({ theme: 'dark' })}
-                      className={`w-full p-4 rounded-2xl flex items-center justify-between border-2 transition-all ${currentUser.theme === 'dark' ? 'border-violet-500 bg-violet-500/10' : 'border-transparent bg-slate-800/50'}`}
+                      className={`w-full p-4 rounded-2xl flex items-center justify-between border-2 transition-all ${currentUser.theme === 'dark' ? 'border-green-500 bg-green-500/10' : 'border-transparent bg-slate-800/50'}`}
                     >
                       <div className="flex items-center gap-4">
-                        <i className={`fas fa-moon ${currentUser.theme === 'dark' ? 'text-violet-500' : 'text-slate-400'}`}></i>
-                        <span className={`font-bold ${currentUser.theme === 'dark' ? 'text-violet-100' : 'text-slate-500'}`}>{t('prof_theme_dark_label', lang)}</span>
+                        <i className={`fas fa-moon ${currentUser.theme === 'dark' ? 'text-green-500' : 'text-slate-400'}`}></i>
+                        <span className={`font-bold ${currentUser.theme === 'dark' ? 'text-green-100' : 'text-slate-500'}`}>{t('prof_theme_dark_label', lang)}</span>
                       </div>
-                      {currentUser.theme === 'dark' && <i className="fas fa-check-circle text-violet-500"></i>}
+                      {currentUser.theme === 'dark' && <i className="fas fa-check-circle text-green-500"></i>}
                     </button>
                   </div>
                 </section>
@@ -1914,7 +1914,7 @@ const App: React.FC = () => {
             const STATION_PALETTE = [
               { hex: '#10b981', light: '#d1fae5', border: '#10b981', text: '#059669', label: 'emerald' },
               { hex: '#3b82f6', light: '#dbeafe', border: '#3b82f6', text: '#2563eb', label: 'blue' },
-              { hex: '#8b5cf6', light: '#ede9fe', border: '#8b5cf6', text: '#7c3aed', label: 'violet' },
+              { hex: '#22c55e', light: '#dcfce7', border: '#22c55e', text: '#16a34a', label: 'green' },
               { hex: '#f59e0b', light: '#fef3c7', border: '#f59e0b', text: '#d97706', label: 'amber' },
               { hex: '#ec4899', light: '#fce7f3', border: '#ec4899', text: '#db2777', label: 'pink' },
               { hex: '#06b6d4', light: '#cffafe', border: '#06b6d4', text: '#0891b2', label: 'cyan' },
@@ -1966,7 +1966,7 @@ const App: React.FC = () => {
                 </div>
                 <button
                   onClick={() => setEditingPlant({ id: Math.random().toString(36).substr(2, 9), name: '', humidityMin: 50, humidityMax: 80, tempMin: 15, tempMax: 30, lightMin: 50, phMin: 6, phMax: 7, notes: '' })}
-                  className="bg-violet-600 text-white px-6 py-3 rounded-2xl font-bold flex items-center gap-3 shadow-lg shadow-violet-100"
+                  className="bg-green-600 text-white px-6 py-3 rounded-2xl font-bold flex items-center gap-3 shadow-lg shadow-green-100"
                 >
                   <i className="fas fa-plus"></i> {t('plant_new', lang)}
                 </button>
@@ -2048,7 +2048,7 @@ const App: React.FC = () => {
                             <i className="fas fa-leaf text-2xl"></i>
                           </div>
                           <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                            <button onClick={() => setEditingPlant(plant)} className={`p-3 rounded-xl transition-colors ${isDarkMode ? 'bg-slate-800 text-slate-400 hover:text-violet-500' : 'bg-slate-100 text-slate-400 hover:text-violet-600'}`}><i className="fas fa-edit"></i></button>
+                            <button onClick={() => setEditingPlant(plant)} className={`p-3 rounded-xl transition-colors ${isDarkMode ? 'bg-slate-800 text-slate-400 hover:text-green-500' : 'bg-slate-100 text-slate-400 hover:text-green-600'}`}><i className="fas fa-edit"></i></button>
                             <button onClick={() => setDeletingPlantId(plant.id)} className={`p-3 rounded-xl transition-colors ${isDarkMode ? 'bg-slate-800 text-slate-400 hover:text-rose-500' : 'bg-slate-100 text-slate-400 hover:text-rose-500'}`}><i className="fas fa-trash"></i></button>
                           </div>
                         </div>
@@ -2082,8 +2082,8 @@ const App: React.FC = () => {
                           onClick={() => setView('config')}
                           className={`mt-auto w-full py-4 rounded-2xl font-black uppercase tracking-widest transition-all active:scale-95 flex items-center justify-center gap-2 ${
                             isUnlinked
-                              ? (isDarkMode ? 'bg-rose-500/20 hover:bg-violet-600 text-rose-300 hover:text-white' : 'bg-rose-100 hover:bg-violet-600 text-rose-500 hover:text-white')
-                              : (isDarkMode ? 'bg-slate-800 hover:bg-violet-600 text-slate-100' : 'bg-slate-100 hover:bg-violet-600 hover:text-white text-slate-600')
+                              ? (isDarkMode ? 'bg-rose-500/20 hover:bg-green-600 text-rose-300 hover:text-white' : 'bg-rose-100 hover:bg-green-600 text-rose-500 hover:text-white')
+                              : (isDarkMode ? 'bg-slate-800 hover:bg-green-600 text-slate-100' : 'bg-slate-100 hover:bg-green-600 hover:text-white text-slate-600')
                           }`}
                         >
                           <i className="fas fa-link text-xs"></i>
@@ -2109,7 +2109,7 @@ const App: React.FC = () => {
                 <p className="text-slate-400 font-medium">{t('cfg_subtitle', lang)}</p>
                 <button
                   onClick={() => setEditingStation({ id: Math.random().toString(36).substr(2, 9), name: '', locationLabel: '', createdAt: new Date().toISOString(), gridRows: 2, gridCols: 2 })}
-                  className="bg-violet-600 text-white px-6 py-3 rounded-2xl font-bold flex items-center gap-3 shadow-lg shadow-violet-100"
+                  className="bg-green-600 text-white px-6 py-3 rounded-2xl font-bold flex items-center gap-3 shadow-lg shadow-green-100"
                 >
                   <i className="fas fa-plus"></i> {t('cfg_new_station', lang)}
                 </button>
@@ -2151,7 +2151,7 @@ const App: React.FC = () => {
                       onClick={() => setExpandedStationId(isExpanded ? null : station.id)}
                     >
                       <div className="flex items-center gap-4">
-                        <div className="w-12 h-12 bg-violet-600 rounded-2xl flex items-center justify-center text-white shadow-lg shadow-violet-600/20">
+                        <div className="w-12 h-12 bg-green-600 rounded-2xl flex items-center justify-center text-white shadow-lg shadow-green-600/20">
                           <i className="fas fa-layer-group"></i>
                         </div>
                         <div>
@@ -2160,7 +2160,7 @@ const App: React.FC = () => {
                         </div>
                       </div>
                       <div className="flex items-center gap-3">
-                        <button onClick={e => { e.stopPropagation(); setEditingStation(station); }} className={`p-3 rounded-xl transition-colors ${isDarkMode ? 'hover:bg-slate-700 text-slate-400 hover:text-violet-400' : 'hover:bg-slate-100 text-slate-400 hover:text-violet-600'}`}>
+                        <button onClick={e => { e.stopPropagation(); setEditingStation(station); }} className={`p-3 rounded-xl transition-colors ${isDarkMode ? 'hover:bg-slate-700 text-slate-400 hover:text-green-400' : 'hover:bg-slate-100 text-slate-400 hover:text-green-600'}`}>
                           <i className="fas fa-edit"></i>
                         </button>
                         <button onClick={e => { e.stopPropagation(); handleDeleteStation(station.id); }} className={`p-3 rounded-xl transition-colors ${isDarkMode ? 'hover:bg-rose-500/20 text-slate-400 hover:text-rose-400' : 'hover:bg-rose-50 text-slate-400 hover:text-rose-500'}`}>
@@ -2213,12 +2213,12 @@ const App: React.FC = () => {
                                           ? 'border-amber-400 bg-amber-400/10 scale-105'
                                           : hasNoPlant
                                           ? 'border-rose-400/60 bg-rose-500/10 animate-pulse'
-                                          : (isDarkMode ? 'border-slate-700 bg-slate-800 hover:border-violet-500/50' : 'border-slate-200 bg-slate-50 hover:border-violet-400')
+                                          : (isDarkMode ? 'border-slate-700 bg-slate-800 hover:border-green-500/50' : 'border-slate-200 bg-slate-50 hover:border-green-400')
                                       }`}
                                     >
                                       <p className={`text-[10px] font-black uppercase tracking-wider truncate ${isDarkMode ? 'text-slate-300' : 'text-slate-700'}`}>{bac.name}</p>
                                       {plant ? (
-                                        <p className="text-[10px] text-violet-500 font-bold mt-1 truncate flex items-center gap-1"><i className="fas fa-seedling"></i>{translatePlantName(plant.name, lang)}</p>
+                                        <p className="text-[10px] text-green-500 font-bold mt-1 truncate flex items-center gap-1"><i className="fas fa-seedling"></i>{translatePlantName(plant.name, lang)}</p>
                                       ) : (
                                         <p className="text-[10px] text-rose-400 font-bold mt-1 flex items-center gap-1"><i className="fas fa-exclamation-circle"></i>{t('cfg_no_plant', lang)}</p>
                                       )}
@@ -2243,7 +2243,7 @@ const App: React.FC = () => {
                                   <div
                                     key={`${row}-${col}`}
                                     onClick={() => { setEditingBac({ stationId: station.id, row, col }); setNewBacName(''); }}
-                                    className={`min-h-[90px] p-3 rounded-2xl border-2 border-dashed cursor-pointer flex items-center justify-center transition-all ${isDarkMode ? 'border-slate-700 hover:border-violet-500/50 hover:bg-violet-500/5' : 'border-slate-200 hover:border-violet-400 hover:bg-violet-50'}`}
+                                    className={`min-h-[90px] p-3 rounded-2xl border-2 border-dashed cursor-pointer flex items-center justify-center transition-all ${isDarkMode ? 'border-slate-700 hover:border-green-500/50 hover:bg-green-500/5' : 'border-slate-200 hover:border-green-400 hover:bg-green-50'}`}
                                   >
                                     <i className="fas fa-plus text-slate-300 text-lg"></i>
                                   </div>
@@ -2295,7 +2295,7 @@ const App: React.FC = () => {
                         <div className="flex flex-col items-center">
                           <div className={`w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 ${
                             isAuto
-                              ? (isDarkMode ? 'bg-violet-500/20 text-violet-400' : 'bg-violet-100 text-violet-600')
+                              ? (isDarkMode ? 'bg-green-500/20 text-green-400' : 'bg-green-100 text-green-600')
                               : (isDarkMode ? 'bg-blue-500/20 text-blue-400' : 'bg-blue-100 text-blue-600')
                           }`}>
                             <i className={`fas ${isAuto ? 'fa-robot' : 'fa-hand-pointer'} text-sm`}></i>
@@ -2309,14 +2309,14 @@ const App: React.FC = () => {
                         <div className={`${cardClasses} flex-1 p-6 rounded-2xl border mb-2`}>
                           <div className="flex items-center justify-between mb-2">
                             <div className="flex items-center gap-3 flex-wrap">
-                              <span className={`text-xs font-black uppercase tracking-wider ${isAuto ? 'text-violet-500' : 'text-blue-500'}`}>
+                              <span className={`text-xs font-black uppercase tracking-wider ${isAuto ? 'text-green-500' : 'text-blue-500'}`}>
                                 {isAuto ? 'AUTO' : 'MANUEL'}
                               </span>
                               <span className={`text-[10px] font-bold px-2 py-0.5 rounded-lg ${isDarkMode ? 'bg-slate-800 text-slate-400' : 'bg-slate-100 text-slate-500'}`}>
                                 <i className="fas fa-microchip mr-1"></i>{deviceInfo?.name || t('cfg_bac_unknown', lang)}
                               </span>
                               {stationInfo && (
-                                <span className={`text-[10px] font-bold px-2 py-0.5 rounded-lg ${isDarkMode ? 'bg-violet-900/30 text-violet-400' : 'bg-violet-50 text-violet-600'}`}>
+                                <span className={`text-[10px] font-bold px-2 py-0.5 rounded-lg ${isDarkMode ? 'bg-green-900/30 text-green-400' : 'bg-green-50 text-green-600'}`}>
                                   <i className="fas fa-layer-group mr-1"></i>{stationInfo.name}
                                 </span>
                               )}
@@ -2454,7 +2454,7 @@ const App: React.FC = () => {
                         <div key={stationId}>
                           {/* En-tête station */}
                           <div className="flex items-center gap-3 mb-5">
-                            <div className="w-10 h-10 bg-violet-600 rounded-2xl flex items-center justify-center text-white shadow-lg shadow-violet-600/20">
+                            <div className="w-10 h-10 bg-green-600 rounded-2xl flex items-center justify-center text-white shadow-lg shadow-green-600/20">
                               <i className="fas fa-layer-group text-sm"></i>
                             </div>
                             <div>
@@ -2471,7 +2471,7 @@ const App: React.FC = () => {
                           </div>
 
                           {/* Groupes par device/bac */}
-                          <div className="space-y-6 pl-4 border-l-2 border-violet-600/20 ml-4">
+                          <div className="space-y-6 pl-4 border-l-2 border-green-600/20 ml-4">
                             {Object.entries(deviceGroups).map(([deviceId, deviceAlerts]) => {
                               const deviceInfo = devices.find(d => d.id === deviceId);
                               return (
@@ -2514,7 +2514,7 @@ const App: React.FC = () => {
                                             {!alert.read && (
                                               <span className="text-[10px] font-black uppercase tracking-wider text-rose-500 px-1.5 py-0.5 rounded-md bg-rose-500/10">{t('alert_new', lang)}</span>
                                             )}
-                                            <span className={`text-[10px] font-bold px-2 py-0.5 rounded-lg ${isDarkMode ? 'bg-violet-900/40 text-violet-400' : 'bg-violet-100 text-violet-700'}`}>
+                                            <span className={`text-[10px] font-bold px-2 py-0.5 rounded-lg ${isDarkMode ? 'bg-green-900/40 text-green-400' : 'bg-green-100 text-green-700'}`}>
                                               <i className="fas fa-seedling mr-1"></i>{translatePlantName(alert.plantName, lang)}
                                             </span>
                                             <span className={`text-[10px] font-bold px-2 py-0.5 rounded-lg ${isDarkMode ? 'bg-slate-800 text-slate-400' : 'bg-slate-200/70 text-slate-500'}`}>
@@ -2524,7 +2524,7 @@ const App: React.FC = () => {
                                           <p className={`text-sm font-bold ${isDarkMode ? 'text-slate-200' : 'text-slate-700'}`}>{alert.message}</p>
                                           <div className="flex items-center justify-between mt-2">
                                             <p className="text-[10px] text-slate-400">{new Date(alert.timestamp).toLocaleString()}</p>
-                                            <span className={`text-[10px] font-bold opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-1 ${isDarkMode ? 'text-violet-400' : 'text-violet-600'}`}>
+                                            <span className={`text-[10px] font-bold opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-1 ${isDarkMode ? 'text-green-400' : 'text-green-600'}`}>
                                               <i className="fas fa-arrow-right"></i>{t('alert_see_dashboard', lang)}
                                             </span>
                                           </div>
@@ -2585,11 +2585,11 @@ const App: React.FC = () => {
             <div className="space-y-4">
               <div className="space-y-2">
                 <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest ml-1">{t('cfg_station_name', lang)}</label>
-                <input type="text" value={editingStation.name} onChange={e => setEditingStation({ ...editingStation, name: e.target.value })} placeholder={t('cfg_station_name_ph', lang)} className={`w-full ${inputClasses} rounded-2xl p-4 font-bold outline-none focus:ring-2 focus:ring-violet-500`} autoFocus />
+                <input type="text" value={editingStation.name} onChange={e => setEditingStation({ ...editingStation, name: e.target.value })} placeholder={t('cfg_station_name_ph', lang)} className={`w-full ${inputClasses} rounded-2xl p-4 font-bold outline-none focus:ring-2 focus:ring-green-500`} autoFocus />
               </div>
               <div className="space-y-2">
                 <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest ml-1">{t('cfg_station_location', lang)}</label>
-                <input type="text" value={editingStation.locationLabel} onChange={e => setEditingStation({ ...editingStation, locationLabel: e.target.value })} placeholder={t('cfg_station_location_ph', lang)} className={`w-full ${inputClasses} rounded-2xl p-4 font-bold outline-none focus:ring-2 focus:ring-violet-500`} />
+                <input type="text" value={editingStation.locationLabel} onChange={e => setEditingStation({ ...editingStation, locationLabel: e.target.value })} placeholder={t('cfg_station_location_ph', lang)} className={`w-full ${inputClasses} rounded-2xl p-4 font-bold outline-none focus:ring-2 focus:ring-green-500`} />
               </div>
 
               {/* Taille de la grille */}
@@ -2614,14 +2614,14 @@ const App: React.FC = () => {
                             type="button"
                             onClick={() => setEditingStation({ ...editingStation, [key]: Math.max(minVal, val - 1) })}
                             disabled={val <= minVal}
-                            className="w-8 h-8 rounded-xl bg-violet-500/10 text-violet-500 font-black text-lg flex items-center justify-center disabled:opacity-30 hover:bg-violet-500/20 transition-colors"
+                            className="w-8 h-8 rounded-xl bg-green-500/10 text-green-500 font-black text-lg flex items-center justify-center disabled:opacity-30 hover:bg-green-500/20 transition-colors"
                           >−</button>
                           <span className="flex-1 text-center font-black text-lg">{val}</span>
                           <button
                             type="button"
                             onClick={() => setEditingStation({ ...editingStation, [key]: Math.min(8, val + 1) })}
                             disabled={val >= 8}
-                            className="w-8 h-8 rounded-xl bg-violet-500/10 text-violet-500 font-black text-lg flex items-center justify-center disabled:opacity-30 hover:bg-violet-500/20 transition-colors"
+                            className="w-8 h-8 rounded-xl bg-green-500/10 text-green-500 font-black text-lg flex items-center justify-center disabled:opacity-30 hover:bg-green-500/20 transition-colors"
                           >+</button>
                         </div>
                       </div>
@@ -2638,7 +2638,7 @@ const App: React.FC = () => {
             </div>
             <div className="flex gap-4 pt-2">
               <button onClick={() => setEditingStation(null)} className={`flex-1 py-4 rounded-2xl font-black uppercase tracking-widest ${isDarkMode ? 'bg-slate-800 text-slate-300 hover:bg-slate-700' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}>{t('cfg_cancel', lang)}</button>
-              <button onClick={() => { if (editingStation.name.trim()) handleSaveStation(editingStation); }} className="flex-1 bg-violet-600 hover:bg-violet-700 text-white py-4 rounded-2xl font-black uppercase tracking-widest shadow-lg shadow-violet-600/20">{t('cfg_save', lang)}</button>
+              <button onClick={() => { if (editingStation.name.trim()) handleSaveStation(editingStation); }} className="flex-1 bg-green-600 hover:bg-green-700 text-white py-4 rounded-2xl font-black uppercase tracking-widest shadow-lg shadow-green-600/20">{t('cfg_save', lang)}</button>
             </div>
           </div>
         </div>
@@ -2664,7 +2664,7 @@ const App: React.FC = () => {
               <div className="space-y-3">
                 <div className="space-y-1">
                   <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest ml-1">{t('cfg_label_name', lang)}</label>
-                  <input type="text" value={bac.name} onChange={e => update({ name: e.target.value })} className={`w-full ${inputClasses} rounded-2xl p-3 font-bold outline-none focus:ring-2 focus:ring-violet-500`} />
+                  <input type="text" value={bac.name} onChange={e => update({ name: e.target.value })} className={`w-full ${inputClasses} rounded-2xl p-3 font-bold outline-none focus:ring-2 focus:ring-green-500`} />
                 </div>
                 <div className="grid grid-cols-2 gap-3">
                   <div className="space-y-1">
@@ -2681,8 +2681,8 @@ const App: React.FC = () => {
                   </div>
                 </div>
                 {bac.physicalId && (
-                  <div className={`p-3 rounded-xl flex items-center gap-2 ${isDarkMode ? 'bg-violet-500/10' : 'bg-violet-50'}`}>
-                    <i className="fas fa-link text-violet-500 text-xs"></i>
+                  <div className={`p-3 rounded-xl flex items-center gap-2 ${isDarkMode ? 'bg-green-500/10' : 'bg-green-50'}`}>
+                    <i className="fas fa-link text-green-500 text-xs"></i>
                     <p className={`text-[10px] font-mono truncate ${isDarkMode ? 'text-slate-300' : 'text-slate-600'}`}>{bac.physicalId}</p>
                   </div>
                 )}
@@ -2697,7 +2697,7 @@ const App: React.FC = () => {
                         onClick={() => {
                           navigator.clipboard.writeText(bac.apiKey!);
                         }}
-                        className="flex-shrink-0 text-xs px-2 py-1 rounded-lg bg-violet-600 hover:bg-violet-700 text-white font-bold"
+                        className="flex-shrink-0 text-xs px-2 py-1 rounded-lg bg-green-600 hover:bg-green-700 text-white font-bold"
                         title="Copier la clé"
                       >
                         <i className="fas fa-copy"></i>
@@ -2733,7 +2733,7 @@ const App: React.FC = () => {
                   );
                 })}
               </div>
-              <button onClick={() => setConfiguringBacId(null)} className="w-full py-4 rounded-2xl bg-violet-600 hover:bg-violet-700 text-white font-black uppercase tracking-widest">{t('gen_close', lang)}</button>
+              <button onClick={() => setConfiguringBacId(null)} className="w-full py-4 rounded-2xl bg-green-600 hover:bg-green-700 text-white font-black uppercase tracking-widest">{t('gen_close', lang)}</button>
             </div>
           </div>
         );
@@ -2744,23 +2744,23 @@ const App: React.FC = () => {
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 backdrop-blur-sm" onClick={() => { setEditingBac(null); setNewBacName(''); setNewBacPhysicalId(''); }}>
           <div className={`w-full max-w-md mx-4 max-h-[90vh] overflow-y-auto ${cardClasses} rounded-[32px] border shadow-2xl p-10 space-y-6`} onClick={e => e.stopPropagation()}>
             <h3 className={`text-xl font-black ${isDarkMode ? 'text-slate-100' : 'text-slate-800'}`}>
-              <i className="fas fa-box mr-2 text-violet-500"></i>{t('cfg_new_bac_title', lang)}
+              <i className="fas fa-box mr-2 text-green-500"></i>{t('cfg_new_bac_title', lang)}
             </h3>
             <div className="space-y-2">
               <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest ml-1">{t('cfg_bac_name', lang)}</label>
               <input
                 type="text" value={newBacName} onChange={e => setNewBacName(e.target.value)}
                 placeholder={t('cfg_bac_name_ph', lang)} autoFocus
-                className={`w-full ${inputClasses} rounded-2xl p-4 font-bold outline-none focus:ring-2 focus:ring-violet-500`}
+                className={`w-full ${inputClasses} rounded-2xl p-4 font-bold outline-none focus:ring-2 focus:ring-green-500`}
               />
             </div>
 
             {/* Lien physique QR / manuel */}
             {newBacPhysicalId ? (
-              <div className={`p-4 rounded-2xl flex items-center gap-3 ${isDarkMode ? 'bg-violet-500/10' : 'bg-violet-50'}`}>
-                <i className="fas fa-link text-violet-500"></i>
+              <div className={`p-4 rounded-2xl flex items-center gap-3 ${isDarkMode ? 'bg-green-500/10' : 'bg-green-50'}`}>
+                <i className="fas fa-link text-green-500"></i>
                 <div className="flex-1 min-w-0">
-                  <p className="text-xs font-bold text-violet-500">{t('cfg_physical_linked', lang)}</p>
+                  <p className="text-xs font-bold text-green-500">{t('cfg_physical_linked', lang)}</p>
                   <p className={`text-[10px] font-mono truncate ${isDarkMode ? 'text-slate-300' : 'text-slate-600'}`}>{newBacPhysicalId}</p>
                 </div>
                 <button onClick={() => setNewBacPhysicalId('')} className="text-slate-400 hover:text-rose-400 text-xs"><i className="fas fa-times"></i></button>
@@ -2778,7 +2778,7 @@ const App: React.FC = () => {
                   setEditingBac(null); setNewBacPhysicalId('');
                 }}
                 disabled={!newBacName.trim()}
-                className="flex-1 bg-violet-600 hover:bg-violet-700 disabled:opacity-40 text-white py-4 rounded-2xl font-black uppercase tracking-widest shadow-lg shadow-violet-600/20"
+                className="flex-1 bg-green-600 hover:bg-green-700 disabled:opacity-40 text-white py-4 rounded-2xl font-black uppercase tracking-widest shadow-lg shadow-green-600/20"
               >
                 {t('cfg_create_bac', lang)}
               </button>
@@ -2809,7 +2809,7 @@ const App: React.FC = () => {
                   value={catalogSearch}
                   onChange={e => setCatalogSearch(e.target.value)}
                   placeholder="Ex: Rosa, Lavandula, Mentha, Solanum..."
-                  className={`w-full ${inputClasses} rounded-2xl p-4 pl-11 font-bold outline-none focus:ring-2 focus:ring-violet-500 transition-all`}
+                  className={`w-full ${inputClasses} rounded-2xl p-4 pl-11 font-bold outline-none focus:ring-2 focus:ring-green-500 transition-all`}
                 />
                 <i className={`fas ${catalogLoading ? 'fa-spinner fa-spin' : 'fa-leaf'} absolute left-4 top-1/2 -translate-y-1/2 text-slate-400`}></i>
               </div>
@@ -2821,7 +2821,7 @@ const App: React.FC = () => {
                     <button
                       key={cp.pid + i}
                       onClick={() => applyCatalogPlant(cp)}
-                      className={`w-full text-left px-4 py-3 flex items-center justify-between gap-3 transition-colors ${isDarkMode ? 'hover:bg-violet-600/20' : 'hover:bg-violet-50'} ${i > 0 ? (isDarkMode ? 'border-t border-slate-700' : 'border-t border-slate-100') : ''}`}
+                      className={`w-full text-left px-4 py-3 flex items-center justify-between gap-3 transition-colors ${isDarkMode ? 'hover:bg-green-600/20' : 'hover:bg-green-50'} ${i > 0 ? (isDarkMode ? 'border-t border-slate-700' : 'border-t border-slate-100') : ''}`}
                     >
                       <div className="min-w-0">
                         <p className={`font-bold text-sm truncate ${isDarkMode ? 'text-slate-100' : 'text-slate-800'}`}>
@@ -2831,7 +2831,7 @@ const App: React.FC = () => {
                       </div>
                       <div className="flex-shrink-0 text-right">
                         <p className="text-[10px] text-slate-400">{cp.temp_min}–{cp.temp_max}°C</p>
-                        <p className="text-[10px] text-violet-500 font-bold">Hum {cp.humidity_min}–{cp.humidity_max}%</p>
+                        <p className="text-[10px] text-green-500 font-bold">Hum {cp.humidity_min}–{cp.humidity_max}%</p>
                       </div>
                     </button>
                     );
@@ -2858,7 +2858,7 @@ const App: React.FC = () => {
                   value={editingPlant.name}
                   onChange={e => setEditingPlant({ ...editingPlant, name: e.target.value })}
                   placeholder="Ex: Basilic Grand Vert"
-                  className={`w-full ${inputClasses} rounded-2xl p-4 font-bold outline-none focus:ring-2 focus:ring-violet-500 transition-all`}
+                  className={`w-full ${inputClasses} rounded-2xl p-4 font-bold outline-none focus:ring-2 focus:ring-green-500 transition-all`}
                 />
               </div>
 
@@ -2874,7 +2874,7 @@ const App: React.FC = () => {
                   >
                     <i className="fas fa-tint text-blue-400 text-xs"></i>
                     <span className="text-[10px] font-black uppercase text-slate-400 tracking-widest">{t('plant_form_humidity', lang)}</span>
-                    <i className={`fas fa-circle-info text-[10px] transition-colors ${openTooltip === 'humidity' ? 'text-violet-500' : 'text-slate-300'}`}></i>
+                    <i className={`fas fa-circle-info text-[10px] transition-colors ${openTooltip === 'humidity' ? 'text-green-500' : 'text-slate-300'}`}></i>
                   </button>
                   {openTooltip === 'humidity' && (
                     <div className={`absolute left-0 top-full mt-2 z-10 w-72 p-3 rounded-xl text-xs shadow-xl border ${isDarkMode ? 'bg-slate-800 border-slate-700 text-slate-300' : 'bg-white border-slate-200 text-slate-600'}`}>
@@ -2885,11 +2885,11 @@ const App: React.FC = () => {
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <span className={`text-[10px] font-bold ml-1 ${isDarkMode ? 'text-slate-500' : 'text-slate-400'}`}>{t('gen_minimum', lang)}</span>
-                    <input type="number" min="0" max="100" value={editingPlant.humidityMin} onChange={e => setEditingPlant({ ...editingPlant, humidityMin: +e.target.value })} className={`w-full ${inputClasses} rounded-2xl p-4 font-bold outline-none focus:ring-2 focus:ring-violet-500`} />
+                    <input type="number" min="0" max="100" value={editingPlant.humidityMin} onChange={e => setEditingPlant({ ...editingPlant, humidityMin: +e.target.value })} className={`w-full ${inputClasses} rounded-2xl p-4 font-bold outline-none focus:ring-2 focus:ring-green-500`} />
                   </div>
                   <div>
                     <span className={`text-[10px] font-bold ml-1 ${isDarkMode ? 'text-slate-500' : 'text-slate-400'}`}>{t('gen_maximum', lang)}</span>
-                    <input type="number" min="0" max="100" value={editingPlant.humidityMax} onChange={e => setEditingPlant({ ...editingPlant, humidityMax: +e.target.value })} className={`w-full ${inputClasses} rounded-2xl p-4 font-bold outline-none focus:ring-2 focus:ring-violet-500`} />
+                    <input type="number" min="0" max="100" value={editingPlant.humidityMax} onChange={e => setEditingPlant({ ...editingPlant, humidityMax: +e.target.value })} className={`w-full ${inputClasses} rounded-2xl p-4 font-bold outline-none focus:ring-2 focus:ring-green-500`} />
                   </div>
                 </div>
               </div>
@@ -2906,7 +2906,7 @@ const App: React.FC = () => {
                   >
                     <i className="fas fa-thermometer-half text-amber-400 text-xs"></i>
                     <span className="text-[10px] font-black uppercase text-slate-400 tracking-widest">{t('plant_form_temp', lang)}</span>
-                    <i className={`fas fa-circle-info text-[10px] transition-colors ${openTooltip === 'temp' ? 'text-violet-500' : 'text-slate-300'}`}></i>
+                    <i className={`fas fa-circle-info text-[10px] transition-colors ${openTooltip === 'temp' ? 'text-green-500' : 'text-slate-300'}`}></i>
                   </button>
                   {openTooltip === 'temp' && (
                     <div className={`absolute left-0 top-full mt-2 z-10 w-72 p-3 rounded-xl text-xs shadow-xl border ${isDarkMode ? 'bg-slate-800 border-slate-700 text-slate-300' : 'bg-white border-slate-200 text-slate-600'}`}>
@@ -2917,11 +2917,11 @@ const App: React.FC = () => {
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <span className={`text-[10px] font-bold ml-1 ${isDarkMode ? 'text-slate-500' : 'text-slate-400'}`}>{t('gen_minimum', lang)}</span>
-                    <input type="number" value={editingPlant.tempMin} onChange={e => setEditingPlant({ ...editingPlant, tempMin: +e.target.value })} className={`w-full ${inputClasses} rounded-2xl p-4 font-bold outline-none focus:ring-2 focus:ring-violet-500`} />
+                    <input type="number" value={editingPlant.tempMin} onChange={e => setEditingPlant({ ...editingPlant, tempMin: +e.target.value })} className={`w-full ${inputClasses} rounded-2xl p-4 font-bold outline-none focus:ring-2 focus:ring-green-500`} />
                   </div>
                   <div>
                     <span className={`text-[10px] font-bold ml-1 ${isDarkMode ? 'text-slate-500' : 'text-slate-400'}`}>{t('gen_maximum', lang)}</span>
-                    <input type="number" value={editingPlant.tempMax} onChange={e => setEditingPlant({ ...editingPlant, tempMax: +e.target.value })} className={`w-full ${inputClasses} rounded-2xl p-4 font-bold outline-none focus:ring-2 focus:ring-violet-500`} />
+                    <input type="number" value={editingPlant.tempMax} onChange={e => setEditingPlant({ ...editingPlant, tempMax: +e.target.value })} className={`w-full ${inputClasses} rounded-2xl p-4 font-bold outline-none focus:ring-2 focus:ring-green-500`} />
                   </div>
                 </div>
               </div>
@@ -2938,7 +2938,7 @@ const App: React.FC = () => {
                   >
                     <i className="fas fa-sun text-yellow-400 text-xs"></i>
                     <span className="text-[10px] font-black uppercase text-slate-400 tracking-widest">{t('plant_form_light', lang)}</span>
-                    <i className={`fas fa-circle-info text-[10px] transition-colors ${openTooltip === 'light' ? 'text-violet-500' : 'text-slate-300'}`}></i>
+                    <i className={`fas fa-circle-info text-[10px] transition-colors ${openTooltip === 'light' ? 'text-green-500' : 'text-slate-300'}`}></i>
                   </button>
                   {openTooltip === 'light' && (
                     <div className={`absolute left-0 top-full mt-2 z-10 w-72 p-3 rounded-xl text-xs shadow-xl border ${isDarkMode ? 'bg-slate-800 border-slate-700 text-slate-300' : 'bg-white border-slate-200 text-slate-600'}`}>
@@ -2946,7 +2946,7 @@ const App: React.FC = () => {
                     </div>
                   )}
                 </div>
-                <input type="number" min="0" max="100" value={editingPlant.lightMin} onChange={e => setEditingPlant({ ...editingPlant, lightMin: +e.target.value })} className={`w-full ${inputClasses} rounded-2xl p-4 font-bold outline-none focus:ring-2 focus:ring-violet-500`} />
+                <input type="number" min="0" max="100" value={editingPlant.lightMin} onChange={e => setEditingPlant({ ...editingPlant, lightMin: +e.target.value })} className={`w-full ${inputClasses} rounded-2xl p-4 font-bold outline-none focus:ring-2 focus:ring-green-500`} />
               </div>
 
               {/* pH */}
@@ -2959,9 +2959,9 @@ const App: React.FC = () => {
                     onMouseEnter={() => setOpenTooltip('ph')}
                     onMouseLeave={() => setOpenTooltip(prev => prev === 'ph' ? null : prev)}
                   >
-                    <i className="fas fa-flask text-violet-400 text-xs"></i>
+                    <i className="fas fa-flask text-green-400 text-xs"></i>
                     <span className="text-[10px] font-black uppercase text-slate-400 tracking-widest">{t('plant_form_ph', lang)}</span>
-                    <i className={`fas fa-circle-info text-[10px] transition-colors ${openTooltip === 'ph' ? 'text-violet-500' : 'text-slate-300'}`}></i>
+                    <i className={`fas fa-circle-info text-[10px] transition-colors ${openTooltip === 'ph' ? 'text-green-500' : 'text-slate-300'}`}></i>
                   </button>
                   {openTooltip === 'ph' && (
                     <div className={`absolute left-0 top-full mt-2 z-10 w-72 p-3 rounded-xl text-xs shadow-xl border ${isDarkMode ? 'bg-slate-800 border-slate-700 text-slate-300' : 'bg-white border-slate-200 text-slate-600'}`}>
@@ -2972,11 +2972,11 @@ const App: React.FC = () => {
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <span className={`text-[10px] font-bold ml-1 ${isDarkMode ? 'text-slate-500' : 'text-slate-400'}`}>{t('gen_minimum', lang)}</span>
-                    <input type="number" step="0.1" min="0" max="14" value={editingPlant.phMin} onChange={e => setEditingPlant({ ...editingPlant, phMin: +e.target.value })} className={`w-full ${inputClasses} rounded-2xl p-4 font-bold outline-none focus:ring-2 focus:ring-violet-500`} />
+                    <input type="number" step="0.1" min="0" max="14" value={editingPlant.phMin} onChange={e => setEditingPlant({ ...editingPlant, phMin: +e.target.value })} className={`w-full ${inputClasses} rounded-2xl p-4 font-bold outline-none focus:ring-2 focus:ring-green-500`} />
                   </div>
                   <div>
                     <span className={`text-[10px] font-bold ml-1 ${isDarkMode ? 'text-slate-500' : 'text-slate-400'}`}>{t('gen_maximum', lang)}</span>
-                    <input type="number" step="0.1" min="0" max="14" value={editingPlant.phMax} onChange={e => setEditingPlant({ ...editingPlant, phMax: +e.target.value })} className={`w-full ${inputClasses} rounded-2xl p-4 font-bold outline-none focus:ring-2 focus:ring-violet-500`} />
+                    <input type="number" step="0.1" min="0" max="14" value={editingPlant.phMax} onChange={e => setEditingPlant({ ...editingPlant, phMax: +e.target.value })} className={`w-full ${inputClasses} rounded-2xl p-4 font-bold outline-none focus:ring-2 focus:ring-green-500`} />
                   </div>
                 </div>
               </div>
@@ -2988,7 +2988,7 @@ const App: React.FC = () => {
                   onChange={e => setEditingPlant({ ...editingPlant, notes: e.target.value })}
                   rows={3}
                   placeholder={t('plant_notes_placeholder', lang)}
-                  className={`w-full ${inputClasses} rounded-2xl p-4 font-bold outline-none focus:ring-2 focus:ring-violet-500 resize-none`}
+                  className={`w-full ${inputClasses} rounded-2xl p-4 font-bold outline-none focus:ring-2 focus:ring-green-500 resize-none`}
                 />
               </div>
             </div>
@@ -3002,7 +3002,7 @@ const App: React.FC = () => {
               </button>
               <button
                 onClick={() => { if (editingPlant.name.trim()) handlePlantSave(editingPlant); }}
-                className="flex-1 bg-violet-600 hover:bg-violet-700 text-white py-4 rounded-2xl font-black uppercase tracking-widest transition-all shadow-lg shadow-violet-600/20 active:scale-95"
+                className="flex-1 bg-green-600 hover:bg-green-700 text-white py-4 rounded-2xl font-black uppercase tracking-widest transition-all shadow-lg shadow-green-600/20 active:scale-95"
               >
                 {t('plant_save', lang)}
               </button>

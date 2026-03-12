@@ -21,30 +21,30 @@ const Auth: React.FC<AuthProps> = ({ type, onBack, onSwitch, onSuccess, lang = '
 
   return (
     <div className="min-h-screen bg-zinc-950 text-zinc-100 flex items-center justify-center p-6 relative overflow-hidden">
-      <div className="absolute inset-0 bg-gradient-to-b from-violet-500/5 via-transparent to-transparent pointer-events-none" />
-      <div className="absolute top-0 right-0 w-96 h-96 bg-violet-500/5 rounded-full blur-3xl pointer-events-none" />
-      <div className="absolute bottom-0 left-0 w-64 h-64 bg-purple-500/5 rounded-full blur-3xl pointer-events-none" />
+      <div className="absolute inset-0 bg-gradient-to-b from-green-500/5 via-transparent to-transparent pointer-events-none" />
+      <div className="absolute top-0 right-0 w-96 h-96 bg-green-500/5 rounded-full blur-3xl pointer-events-none" />
+      <div className="absolute bottom-0 left-0 w-64 h-64 bg-green-600/5 rounded-full blur-3xl pointer-events-none" />
 
       <div className="w-full max-w-md relative z-10">
-        <div className="bg-zinc-900/95 backdrop-blur-xl rounded-2xl shadow-2xl shadow-violet-950/30 border border-zinc-700/50 p-8 lg:p-10">
+        <div className="bg-zinc-900/95 backdrop-blur-xl rounded-2xl shadow-2xl shadow-green-950/30 border border-zinc-700/50 p-8 lg:p-10">
           <button
             onClick={onBack}
-            className="absolute top-6 left-6 text-zinc-400 hover:text-violet-400 transition-colors duration-300 p-1 rounded-lg hover:scale-110"
+            className="absolute top-6 left-6 text-zinc-400 hover:text-green-400 transition-colors duration-300 p-1 rounded-lg hover:scale-110"
             aria-label="Retour"
           >
             <i className="fas fa-arrow-left text-lg" />
           </button>
 
           <div className="flex items-center gap-3 pt-2 pb-6">
-            <div className="w-10 h-10 bg-gradient-to-br from-violet-500 to-purple-600 rounded-xl flex items-center justify-center text-white shadow-lg shadow-violet-500/25">
+            <div className="w-10 h-10 bg-gradient-to-br from-green-500 to-green-700 rounded-xl flex items-center justify-center text-white shadow-lg shadow-green-500/25">
               <i className="fas fa-leaf text-lg" />
             </div>
             <span className="text-xl font-black tracking-tight text-white">SECOMO</span>
           </div>
 
           <div className="text-center mb-8">
-            <div className="w-14 h-14 bg-violet-500/10 border border-violet-500/20 rounded-xl flex items-center justify-center mx-auto mb-5">
-              <i className={`fas ${type === 'login' ? 'fa-lock' : 'fa-user-plus'} text-xl text-violet-400`} />
+            <div className="w-14 h-14 bg-green-500/10 border border-green-500/20 rounded-xl flex items-center justify-center mx-auto mb-5">
+              <i className={`fas ${type === 'login' ? 'fa-lock' : 'fa-user-plus'} text-xl text-green-400`} />
             </div>
             <h2 className="text-2xl font-bold text-white tracking-tight">
               {type === 'login' ? t('auth_login_title', lang) : t('auth_register_title', lang)}
@@ -88,7 +88,7 @@ const Auth: React.FC<AuthProps> = ({ type, onBack, onSwitch, onSuccess, lang = '
                     value={firstName}
                     onChange={(e) => setFirstName(e.target.value)}
                     placeholder="Jean"
-                    className="w-full bg-zinc-800 border border-zinc-600 rounded-xl py-3.5 px-4 font-medium text-white outline-none focus:ring-2 focus:ring-violet-500/50 focus:border-violet-500/50 transition-all duration-300 placeholder:text-zinc-500"
+                    className="w-full bg-zinc-800 border border-zinc-600 rounded-xl py-3.5 px-4 font-medium text-white outline-none focus:ring-2 focus:ring-green-500/50 focus:border-green-500/50 transition-all duration-300 placeholder:text-zinc-500"
                   />
                 </div>
                 <div className="space-y-2">
@@ -99,7 +99,7 @@ const Auth: React.FC<AuthProps> = ({ type, onBack, onSwitch, onSuccess, lang = '
                     value={lastName}
                     onChange={(e) => setLastName(e.target.value)}
                     placeholder="Dupont"
-                    className="w-full bg-zinc-800 border border-zinc-600 rounded-xl py-3.5 px-4 font-medium text-white outline-none focus:ring-2 focus:ring-violet-500/50 focus:border-violet-500/50 transition-all duration-300 placeholder:text-zinc-500"
+                    className="w-full bg-zinc-800 border border-zinc-600 rounded-xl py-3.5 px-4 font-medium text-white outline-none focus:ring-2 focus:ring-green-500/50 focus:border-green-500/50 transition-all duration-300 placeholder:text-zinc-500"
                   />
                 </div>
               </div>
@@ -117,7 +117,7 @@ const Auth: React.FC<AuthProps> = ({ type, onBack, onSwitch, onSuccess, lang = '
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   placeholder="nom@exemple.com"
-                  className="w-full bg-zinc-800 border border-zinc-600 rounded-xl py-3.5 pl-11 pr-4 font-medium text-white outline-none focus:ring-2 focus:ring-violet-500/50 focus:border-violet-500/50 transition-all duration-300 placeholder:text-zinc-500"
+                  className="w-full bg-zinc-800 border border-zinc-600 rounded-xl py-3.5 pl-11 pr-4 font-medium text-white outline-none focus:ring-2 focus:ring-green-500/50 focus:border-green-500/50 transition-all duration-300 placeholder:text-zinc-500"
                 />
               </div>
             </div>
@@ -134,7 +134,7 @@ const Auth: React.FC<AuthProps> = ({ type, onBack, onSwitch, onSuccess, lang = '
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   placeholder="••••••••"
-                  className="w-full bg-zinc-800 border border-zinc-600 rounded-xl py-3.5 pl-11 pr-4 font-medium text-white outline-none focus:ring-2 focus:ring-violet-500/50 focus:border-violet-500/50 transition-all duration-300 placeholder:text-zinc-500"
+                  className="w-full bg-zinc-800 border border-zinc-600 rounded-xl py-3.5 pl-11 pr-4 font-medium text-white outline-none focus:ring-2 focus:ring-green-500/50 focus:border-green-500/50 transition-all duration-300 placeholder:text-zinc-500"
                 />
               </div>
             </div>
@@ -144,14 +144,14 @@ const Auth: React.FC<AuthProps> = ({ type, onBack, onSwitch, onSuccess, lang = '
                 <input
                   type="checkbox"
                   required
-                  className="mt-1 w-4 h-4 rounded border-zinc-600 bg-zinc-800 text-violet-500 focus:ring-violet-500 focus:ring-offset-0 focus:ring-2"
+                  className="mt-1 w-4 h-4 rounded border-zinc-600 bg-zinc-800 text-green-500 focus:ring-green-500 focus:ring-offset-0 focus:ring-2"
                 />
                 <span className="text-xs text-zinc-400 font-medium">
                   {t('auth_cgu', lang)}{' '}
                   <button
                     type="button"
                     onClick={() => setShowConditions(true)}
-                    className="text-violet-400 font-semibold hover:text-violet-300 hover:underline transition-colors"
+                    className="text-green-400 font-semibold hover:text-green-300 hover:underline transition-colors"
                   >
                     {t('auth_cgu_link', lang)}
                   </button>
@@ -163,7 +163,7 @@ const Auth: React.FC<AuthProps> = ({ type, onBack, onSwitch, onSuccess, lang = '
             <button
               type="submit"
               disabled={loading}
-              className="w-full bg-gradient-to-r from-violet-600 to-purple-600 hover:from-violet-500 hover:to-purple-500 text-white font-bold py-3.5 rounded-xl transition-all duration-300 shadow-lg shadow-violet-500/25 hover:scale-[1.02] active:scale-[0.98] flex items-center justify-center gap-2 group disabled:opacity-60 disabled:cursor-not-allowed"
+              className="w-full bg-gradient-to-r from-green-600 to-green-700 hover:from-green-500 hover:to-green-600 text-white font-bold py-3.5 rounded-xl transition-all duration-300 shadow-lg shadow-green-500/25 hover:scale-[1.02] active:scale-[0.98] flex items-center justify-center gap-2 group disabled:opacity-60 disabled:cursor-not-allowed"
             >
               {loading ? (
                 <><i className="fas fa-spinner fa-spin mr-2"></i>{t('auth_connecting', lang)}</>
@@ -179,7 +179,7 @@ const Auth: React.FC<AuthProps> = ({ type, onBack, onSwitch, onSuccess, lang = '
               <button
                 type="button"
                 onClick={onSwitch}
-                className="text-violet-400 font-semibold hover:text-violet-300 hover:underline transition-colors"
+                className="text-green-400 font-semibold hover:text-green-300 hover:underline transition-colors"
               >
                 {t('auth_click_here', lang)}
               </button>
@@ -198,7 +198,7 @@ const Auth: React.FC<AuthProps> = ({ type, onBack, onSwitch, onSuccess, lang = '
           aria-label="Conditions générales d'utilisation"
         >
           <div
-            className="bg-zinc-900 border border-zinc-700 rounded-2xl shadow-2xl shadow-violet-950/30 max-w-lg w-full max-h-[85vh] flex flex-col"
+            className="bg-zinc-900 border border-zinc-700 rounded-2xl shadow-2xl shadow-green-950/30 max-w-lg w-full max-h-[85vh] flex flex-col"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-center justify-between p-6 border-b border-zinc-700">
@@ -206,7 +206,7 @@ const Auth: React.FC<AuthProps> = ({ type, onBack, onSwitch, onSuccess, lang = '
               <button
                 type="button"
                 onClick={() => setShowConditions(false)}
-                className="p-2 text-zinc-400 hover:text-violet-400 rounded-xl transition-colors duration-300 hover:scale-110"
+                className="p-2 text-zinc-400 hover:text-green-400 rounded-xl transition-colors duration-300 hover:scale-110"
                 aria-label="Fermer"
               >
                 <i className="fas fa-times text-lg" />
@@ -238,7 +238,7 @@ const Auth: React.FC<AuthProps> = ({ type, onBack, onSwitch, onSuccess, lang = '
               <button
                 type="button"
                 onClick={() => setShowConditions(false)}
-                className="w-full bg-gradient-to-r from-violet-600 to-purple-600 hover:from-violet-500 hover:to-purple-500 text-white font-bold py-3 rounded-xl transition-all duration-300 hover:scale-[1.02] active:scale-[0.98]"
+                className="w-full bg-gradient-to-r from-green-600 to-green-700 hover:from-green-500 hover:to-green-600 text-white font-bold py-3 rounded-xl transition-all duration-300 hover:scale-[1.02] active:scale-[0.98]"
               >
                 {t('cgu_understood', lang)}
               </button>

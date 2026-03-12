@@ -7,12 +7,12 @@ interface LandingProps {
 
 const Landing: React.FC<LandingProps> = ({ onNavigate }) => {
   return (
-    <div className="min-h-screen bg-zinc-950 text-zinc-100 selection:bg-violet-500/20">
+    <div className="min-h-screen bg-zinc-950 text-zinc-100 selection:bg-green-500/20">
       {/* Navbar */}
       <nav className="fixed top-0 w-full bg-zinc-950/70 backdrop-blur-xl z-50 border-b border-zinc-800/80">
         <div className="max-w-7xl mx-auto px-6 h-20 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-gradient-to-br from-violet-500 to-purple-600 rounded-xl flex items-center justify-center text-white shadow-lg shadow-violet-500/25">
+            <div className="w-10 h-10 bg-gradient-to-br from-green-500 to-green-700 rounded-xl flex items-center justify-center text-white shadow-lg shadow-green-500/25">
               <i className="fas fa-leaf text-xl"></i>
             </div>
             <span className="text-xl font-black tracking-tight text-white">SECOMO</span>
@@ -20,13 +20,13 @@ const Landing: React.FC<LandingProps> = ({ onNavigate }) => {
           <div className="flex items-center gap-4">
             <button
               onClick={() => onNavigate('login')}
-              className="text-sm font-semibold text-zinc-400 hover:text-violet-300 transition-colors"
+              className="text-sm font-semibold text-zinc-400 hover:text-green-300 transition-colors"
             >
               Connexion
             </button>
             <button
               onClick={() => onNavigate('register')}
-              className="bg-gradient-to-r from-violet-600 to-purple-600 hover:from-violet-500 hover:to-purple-500 text-white px-6 py-2.5 rounded-xl text-sm font-bold shadow-lg shadow-violet-500/25 transition-all duration-300 hover:scale-105 active:scale-[0.98]"
+              className="bg-gradient-to-r from-green-600 to-green-700 hover:from-green-500 hover:to-green-600 text-white px-6 py-2.5 rounded-xl text-sm font-bold shadow-lg shadow-green-500/25 transition-all duration-300 hover:scale-105 active:scale-[0.98]"
             >
               Créer un compte
             </button>
@@ -36,16 +36,16 @@ const Landing: React.FC<LandingProps> = ({ onNavigate }) => {
 
       {/* Hero Section */}
       <section className="pt-36 pb-24 px-6 relative">
-        <div className="absolute inset-0 bg-gradient-to-b from-violet-500/5 via-transparent to-transparent pointer-events-none" />
+        <div className="absolute inset-0 bg-gradient-to-b from-green-500/5 via-transparent to-transparent pointer-events-none" />
         <div className="max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-2 gap-16 items-center relative">
           <div className="space-y-8">
-            <div className="inline-flex items-center gap-2 px-4 py-2 bg-violet-500/10 border border-violet-500/20 rounded-full text-xs font-bold uppercase tracking-widest text-violet-300">
-              <span className="w-2 h-2 bg-violet-400 rounded-full animate-pulse" />
+            <div className="inline-flex items-center gap-2 px-4 py-2 bg-green-500/10 border border-green-500/20 rounded-full text-xs font-bold uppercase tracking-widest text-green-300">
+              <span className="w-2 h-2 bg-green-400 rounded-full animate-pulse" />
               Projet SECOMO Innov 2026
             </div>
             <h1 className="text-5xl lg:text-6xl xl:text-7xl font-black text-white leading-[1.05] tracking-tight">
               La serre connectée{' '}
-              <span className="bg-gradient-to-r from-violet-300 to-purple-400 bg-clip-text text-transparent">
+              <span className="bg-gradient-to-r from-green-300 to-green-500 bg-clip-text text-transparent">
                 modulaire.
               </span>
             </h1>
@@ -56,21 +56,21 @@ const Landing: React.FC<LandingProps> = ({ onNavigate }) => {
             <div className="flex flex-col sm:flex-row gap-4 pt-2">
               <button
                 onClick={() => onNavigate('register')}
-                className="bg-gradient-to-r from-violet-600 to-purple-600 hover:from-violet-500 hover:to-purple-500 text-white px-8 py-4 rounded-2xl text-base font-bold shadow-xl shadow-violet-500/25 transition-all duration-300 hover:scale-105 hover:shadow-violet-500/30 active:scale-[0.98] flex items-center justify-center gap-3 group"
+                className="bg-gradient-to-r from-green-600 to-green-700 hover:from-green-500 hover:to-green-600 text-white px-8 py-4 rounded-2xl text-base font-bold shadow-xl shadow-green-500/25 transition-all duration-300 hover:scale-105 hover:shadow-green-500/30 active:scale-[0.98] flex items-center justify-center gap-3 group"
               >
                 Démarrer maintenant
                 <i className="fas fa-arrow-right text-sm group-hover:translate-x-1 transition-transform duration-300" />
               </button>
               <button
                 onClick={() => onNavigate('login')}
-                className="bg-zinc-800/80 hover:bg-zinc-700/80 border border-zinc-600/50 hover:border-violet-500/40 text-zinc-200 hover:text-violet-200 px-8 py-4 rounded-2xl text-base font-bold transition-all duration-300 hover:scale-[1.02] active:scale-[0.98] flex items-center justify-center"
+                className="bg-zinc-800/80 hover:bg-zinc-700/80 border border-zinc-600/50 hover:border-green-500/40 text-zinc-200 hover:text-green-200 px-8 py-4 rounded-2xl text-base font-bold transition-all duration-300 hover:scale-[1.02] active:scale-[0.98] flex items-center justify-center"
               >
                 Voir la démo
               </button>
             </div>
           </div>
           <div className="relative">
-            <div className="absolute -inset-1 bg-gradient-to-r from-violet-500/20 to-purple-500/20 rounded-[28px] blur-xl" />
+            <div className="absolute -inset-1 bg-gradient-to-r from-green-500/20 to-green-600/20 rounded-[28px] blur-xl" />
             <div className="relative overflow-hidden rounded-[24px] border border-zinc-700/50 shadow-2xl">
               <img
                 src="/hero-secomo.png"
@@ -119,9 +119,9 @@ const Landing: React.FC<LandingProps> = ({ onNavigate }) => {
             ].map((item, i) => (
               <div
                 key={i}
-                className="group bg-zinc-800/50 border border-zinc-700/50 p-8 rounded-2xl hover:border-violet-500/30 hover:bg-zinc-800/80 transition-all duration-300"
+                className="group bg-zinc-800/50 border border-zinc-700/50 p-8 rounded-2xl hover:border-green-500/30 hover:bg-zinc-800/80 transition-all duration-300"
               >
-                <div className="w-12 h-12 bg-violet-500/10 border border-violet-500/20 rounded-xl flex items-center justify-center text-xl text-violet-400 mb-6 group-hover:scale-105 transition-transform">
+                <div className="w-12 h-12 bg-green-500/10 border border-green-500/20 rounded-xl flex items-center justify-center text-xl text-green-400 mb-6 group-hover:scale-105 transition-transform">
                   <i className={`fas ${item.icon}`} />
                 </div>
                 <h3 className="text-lg font-bold text-white mb-2 tracking-tight">{item.title}</h3>
@@ -136,8 +136,8 @@ const Landing: React.FC<LandingProps> = ({ onNavigate }) => {
       <section className="py-24 px-6">
         <div className="max-w-7xl mx-auto">
           <div className="relative rounded-3xl bg-gradient-to-br from-zinc-800 to-zinc-900 border border-zinc-700/50 p-12 lg:p-16 overflow-hidden">
-            <div className="absolute top-0 right-0 w-96 h-96 bg-violet-500/10 rounded-full blur-3xl pointer-events-none" />
-            <div className="absolute bottom-0 left-0 w-64 h-64 bg-purple-500/10 rounded-full blur-3xl pointer-events-none" />
+            <div className="absolute top-0 right-0 w-96 h-96 bg-green-500/10 rounded-full blur-3xl pointer-events-none" />
+            <div className="absolute bottom-0 left-0 w-64 h-64 bg-green-600/10 rounded-full blur-3xl pointer-events-none" />
             <div className="relative z-10 grid grid-cols-1 lg:grid-cols-2 gap-16 items-center">
               <div>
                 <h2 className="text-3xl lg:text-4xl font-black text-white mb-10 tracking-tight">
@@ -167,7 +167,7 @@ const Landing: React.FC<LandingProps> = ({ onNavigate }) => {
                     },
                   ].map((s, i) => (
                     <div key={i} className="flex gap-5">
-                      <div className="w-11 h-11 rounded-full border-2 border-violet-500/40 flex items-center justify-center font-black text-lg text-violet-400 shrink-0 bg-violet-500/10">
+                      <div className="w-11 h-11 rounded-full border-2 border-green-500/40 flex items-center justify-center font-black text-lg text-green-400 shrink-0 bg-green-500/10">
                         {s.step}
                       </div>
                       <div>
@@ -180,10 +180,10 @@ const Landing: React.FC<LandingProps> = ({ onNavigate }) => {
               </div>
               <div className="bg-zinc-800/60 backdrop-blur-sm rounded-2xl p-8 border border-zinc-600/50">
                 <div className="flex justify-between items-center mb-6">
-                  <span className="text-xs font-bold uppercase tracking-widest text-violet-400/90">
+                  <span className="text-xs font-bold uppercase tracking-widest text-green-400/90">
                     Aperçu dashboard
                   </span>
-                  <span className="w-2 h-2 rounded-full bg-violet-400" />
+                  <span className="w-2 h-2 rounded-full bg-green-400" />
                 </div>
                 <div className="space-y-4">
                   <div className="h-10 bg-zinc-700/50 rounded-xl" />
@@ -198,7 +198,7 @@ const Landing: React.FC<LandingProps> = ({ onNavigate }) => {
                 <p className="mt-4 text-xs text-zinc-500 font-medium">
                   Capteurs · Historique · Météo · Profil plante · Alertes
                 </p>
-                <div className="mt-6 py-3 px-4 bg-violet-500/20 border border-violet-500/30 rounded-xl text-center font-semibold text-sm text-violet-300">
+                <div className="mt-6 py-3 px-4 bg-green-500/20 border border-green-500/30 rounded-xl text-center font-semibold text-sm text-green-300">
                   Démonstration interactive après inscription
                 </div>
               </div>
@@ -265,7 +265,7 @@ const Landing: React.FC<LandingProps> = ({ onNavigate }) => {
         <div className="max-w-7xl mx-auto grid grid-cols-1 md:grid-cols-4 gap-12">
           <div className="space-y-6">
             <div className="flex items-center gap-3">
-              <div className="w-8 h-8 bg-gradient-to-br from-violet-500 to-purple-600 rounded-lg flex items-center justify-center text-white">
+              <div className="w-8 h-8 bg-gradient-to-br from-green-500 to-green-700 rounded-lg flex items-center justify-center text-white">
                 <i className="fas fa-leaf text-sm" />
               </div>
               <span className="text-lg font-black tracking-tight text-white">SECOMO</span>
@@ -277,21 +277,21 @@ const Landing: React.FC<LandingProps> = ({ onNavigate }) => {
           <div>
             <h5 className="font-bold mb-6 text-zinc-300">Navigation</h5>
             <ul className="space-y-4 text-sm text-zinc-500 font-medium">
-              <li className="hover:text-violet-300 cursor-pointer transition-colors" onClick={() => onNavigate('login')}>
+              <li className="hover:text-green-300 cursor-pointer transition-colors" onClick={() => onNavigate('login')}>
                 Connexion
               </li>
-              <li className="hover:text-violet-300 cursor-pointer transition-colors" onClick={() => onNavigate('register')}>
+              <li className="hover:text-green-300 cursor-pointer transition-colors" onClick={() => onNavigate('register')}>
                 Inscription
               </li>
-              <li className="hover:text-violet-300 cursor-pointer transition-colors">Support technique</li>
+              <li className="hover:text-green-300 cursor-pointer transition-colors">Support technique</li>
             </ul>
           </div>
           <div>
             <h5 className="font-bold mb-6 text-zinc-300">Légal</h5>
             <ul className="space-y-4 text-sm text-zinc-500 font-medium">
-              <li className="hover:text-violet-300 cursor-pointer transition-colors">Confidentialité</li>
-              <li className="hover:text-violet-300 cursor-pointer transition-colors">Conditions d’usage</li>
-              <li className="hover:text-violet-300 cursor-pointer transition-colors">Mentions légales</li>
+              <li className="hover:text-green-300 cursor-pointer transition-colors">Confidentialité</li>
+              <li className="hover:text-green-300 cursor-pointer transition-colors">Conditions d’usage</li>
+              <li className="hover:text-green-300 cursor-pointer transition-colors">Mentions légales</li>
             </ul>
           </div>
           <div>
@@ -300,9 +300,9 @@ const Landing: React.FC<LandingProps> = ({ onNavigate }) => {
               <input
                 type="email"
                 placeholder="Votre email"
-                className="bg-zinc-800 border border-zinc-600 rounded-xl px-4 py-2.5 text-sm flex-1 outline-none focus:ring-2 focus:ring-violet-500/50 focus:border-violet-500/50 text-white placeholder:text-zinc-500"
+                className="bg-zinc-800 border border-zinc-600 rounded-xl px-4 py-2.5 text-sm flex-1 outline-none focus:ring-2 focus:ring-green-500/50 focus:border-green-500/50 text-white placeholder:text-zinc-500"
               />
-              <button className="bg-gradient-to-r from-violet-600 to-purple-600 hover:from-violet-500 hover:to-purple-500 p-2.5 rounded-xl text-white transition-all duration-300 hover:scale-105 active:scale-95">
+              <button className="bg-gradient-to-r from-green-600 to-green-700 hover:from-green-500 hover:to-green-600 p-2.5 rounded-xl text-white transition-all duration-300 hover:scale-105 active:scale-95">
                 <i className="fas fa-paper-plane" />
               </button>
             </div>

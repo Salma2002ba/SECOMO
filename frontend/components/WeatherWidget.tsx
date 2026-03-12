@@ -77,7 +77,7 @@ const WeatherWidget: React.FC<WeatherWidgetProps> = ({ isDark }) => {
   const needsLessWater = weather && weather.precipProb > 50;
 
   return (
-    <div className={`p-6 rounded-2xl shadow-lg text-white relative overflow-hidden transition-all ${isDark ? 'bg-gradient-to-br from-indigo-600 to-slate-900' : 'bg-gradient-to-br from-sky-500 to-blue-600'}`}>
+    <div className={`p-6 rounded-2xl shadow-lg text-white relative overflow-hidden transition-all ${isDark ? 'bg-gradient-to-br from-green-700 to-slate-900' : 'bg-gradient-to-br from-sky-500 to-blue-600'}`}>
       <div className="relative z-10">
         <div className="flex justify-between items-start">
           <div>
