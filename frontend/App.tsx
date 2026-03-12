@@ -37,7 +37,7 @@ function apiUserToUser(u: authService.UserOut): User {
 
 function apiDeviceToDevice(d: deviceService.DeviceOut): Device {
   return {
-    id: d.id, name: d.name, size: d.size as any, level: d.level as any,
+    id: d.id, name: d.name, apiKey: d.api_key, size: d.size as any, level: d.level as any,
     locationLabel: d.location_label, createdAt: d.created_at,
     isWatering: false, automationEnabled: d.automation_enabled,
     isLightOn: false, isFanOn: false, fanSpeed: 0,
@@ -64,8 +64,8 @@ function apiReadingToReading(r: sensorService.SensorReadingOut, deviceId: string
     humidity: r.humidity_soil ?? 0,
     light: r.light ?? 0,
     soilPh: r.soil_ph ?? 0,
-    batteryLevel: (r as any).battery_level ?? 85,
-    waterTankLevel: (r as any).water_tank_level ?? 80,
+    batteryLevel: r.battery_level ?? 85,
+    waterTankLevel: r.water_tank_level ?? 80,
   };
 }
 
@@ -301,8 +301,14 @@ const App: React.FC = () => {
         currentPlantProfileId: localMeta.deviceMeta[d.id]?.currentPlantProfileId || d.currentPlantProfileId,
       }));
 
-      // Load stations from backend
-      const apiStations = await stationService.getStations().catch(() => []);
+      // Load stations from backend — auto-create default if none exist
+      let apiStations = await stationService.getStations().catch(() => []);
+      if (apiStations.length === 0) {
+        try {
+          const created = await stationService.createStation({ name: 'Station Principale', location_label: '' });
+          apiStations = [created];
+        } catch { /* keep empty */ }
+      }
       const finalStations = apiStations.length > 0
         ? apiStations.map(s => ({
             id: s.id, name: s.name, locationLabel: s.location_label, createdAt: s.created_at,
@@ -695,6 +701,7 @@ const App: React.FC = () => {
     deviceId: string,
     prev?: SensorReading,
     deviceState?: { fanSpeed: number; isLightOn: boolean },
+    atTime?: number,
   ): SensorReading => {
     const defaultBase = SIM_BASES[deviceId] || { tempAir: 26, humidity: 52, light: 50, soilPh: 6.2, waterTankLevel: 80 };
     const base = prev || { ...defaultBase, batteryLevel: 85, waterTankLevel: defaultBase.waterTankLevel ?? 80 } as any;
@@ -703,7 +710,7 @@ const App: React.FC = () => {
     const lightBoost = deviceState?.isLightOn ? 4 : 0;
     return {
       deviceId,
-      timestamp: new Date().toISOString(),
+      timestamp: new Date(atTime ?? Date.now()).toISOString(),
       tempAir: Math.min(Math.max(base.tempAir + (Math.random() - 0.45) * 0.6 - fanCooling, 5), 45),
       humidity: Math.min(Math.max(base.humidity + (Math.random() - 0.55) * 1.2, 0), 100),
       light: Math.min(Math.max(base.light + (Math.random() - 0.5) * 3 + lightBoost, 0), 100),
@@ -722,18 +729,19 @@ const App: React.FC = () => {
     if (Object.keys(history).length === 0) {
       const initialHistory: Record<string, SensorReading[]> = {};
       const initialEvents: WateringEvent[] = [];
+      const now = Date.now();
       devices.forEach(dev => {
         let last: SensorReading | undefined;
         const readings: SensorReading[] = [];
         for (let i = 0; i < 30; i++) {
-          last = generateReading(dev.id, last);
+          // Étaler sur la dernière heure : 1 point toutes les 2 minutes
+          last = generateReading(dev.id, last, undefined, now - (30 - 1 - i) * 2 * 60 * 1000);
           readings.push(last);
         }
         initialHistory[dev.id] = readings;
 
         // Générer des événements d'arrosage simulés uniquement en mode hors-ligne
         if (!backendOnline) {
-          const now = Date.now();
           [48, 36, 24, 12, 4].forEach((hoursAgo, i) => {
             initialEvents.push({
               id: `sim-${dev.id}-${i}`,
@@ -793,8 +801,9 @@ const App: React.FC = () => {
       if ((prev[selectedDeviceId]?.length ?? 0) > 0) return prev; // double-check
       const readings: SensorReading[] = [];
       let last: SensorReading | undefined;
+      const t0 = Date.now();
       for (let i = 0; i < 10; i++) {
-        last = generateReading(selectedDeviceId, last);
+        last = generateReading(selectedDeviceId, last, undefined, t0 - (10 - 1 - i) * 2 * 60 * 1000);
         readings.push(last);
       }
       return { ...prev, [selectedDeviceId]: readings };
@@ -1139,6 +1148,26 @@ const App: React.FC = () => {
     }
   };
 
+  // Persiste le lien plante↔bac en backend
+  const persistPlantLink = async (deviceId: string, plantId: string | undefined) => {
+    if (!backendOnline) return;
+    try {
+      const plant = plantId ? plantProfiles.find(p => p.id === plantId) : undefined;
+      await deviceService.setPlantConfig(deviceId, {
+        plant_id: plantId || undefined,
+        name: plant?.name || '',
+        humidity_min: plant?.humidityMin ?? 0,
+        humidity_max: plant?.humidityMax ?? 100,
+        temp_min: plant?.tempMin ?? 0,
+        temp_max: plant?.tempMax ?? 40,
+        light_min: plant?.lightMin ?? 0,
+        ph_min: plant?.phMin ?? 0,
+        ph_max: plant?.phMax ?? 14,
+        notes: plant?.notes || '',
+      });
+    } catch { /* silently fail */ }
+  };
+
   const handleDeletePlant = async (plantId: string) => {
     setPlantProfiles(prev => prev.filter(p => p.id !== plantId));
     // Désassocier les bacs qui utilisaient cette plante
@@ -1215,6 +1244,8 @@ const App: React.FC = () => {
         const bac1 = prev.find(d => d.id === swapSourceBacId);
         const bac2 = prev.find(d => d.id === bacId);
         if (!bac1 || !bac2) return prev;
+        persistPlantLink(bac1.id, bac2.currentPlantProfileId);
+        persistPlantLink(bac2.id, bac1.currentPlantProfileId);
         return prev.map(d => {
           if (d.id === swapSourceBacId) return { ...d, currentPlantProfileId: bac2.currentPlantProfileId };
           if (d.id === bacId) return { ...d, currentPlantProfileId: bac1.currentPlantProfileId };
@@ -1234,8 +1265,7 @@ const App: React.FC = () => {
     let newBacId: string;
     if (backendOnline) {
       try {
-        const created = await deviceService.createDevice({ name, size: 'Moyen', level: 'Base', location_label: '' });
-        await deviceService.updateDevice(created.id, { station_id: stationId, bac_row: row, bac_col: col }).catch(() => {});
+        const created = await deviceService.createDevice({ name, size: 'Moyen', level: 'Base', location_label: '', station_id: stationId, bac_row: row, bac_col: col });
         const newBac: Device = {
           id: created.id, name: created.name, size: 'Moyen', level: 'Base',
           locationLabel: '', stationId, bacPosition: { row, col },
@@ -1273,8 +1303,9 @@ const App: React.FC = () => {
     setHistory(prev => {
       const readings: SensorReading[] = [];
       let last: SensorReading | undefined;
+      const t0 = Date.now();
       for (let i = 0; i < 10; i++) {
-        last = generateReading(newBacId, last);
+        last = generateReading(newBacId, last, undefined, t0 - (10 - 1 - i) * 2 * 60 * 1000);
         readings.push(last);
       }
       return { ...prev, [newBacId]: readings };
@@ -1513,7 +1544,7 @@ const App: React.FC = () => {
                 {/* Cartes capteurs — placeholder si pas encore de données */}
                 {currentReading ? (
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                    <SensorCard label={t('dash_temp', lang)} value={formatTemp(currentReading.tempAir)} unit={currentUser.unit === 'celsius' ? '°C' : '°F'} status={currentPlant ? getSensorStatus(currentReading.tempAir, currentPlant.tempMin, currentPlant.tempMax) : 'neutral'} targetRange={currentPlant ? `${formatTemp(currentPlant.tempMin).toFixed(0)}-${formatTemp(currentPlant.tempMax).toFixed(0)}°` : '—'} icon="fa-thermometer-half" isDark={isDarkMode} lang={lang} />
+                    <SensorCard label={t('dash_temp', lang)} value={formatTemp(currentReading.tempAir)} unit={currentUser.unit === 'celsius' ? '°C' : '°F'} status={currentPlant ? getSensorStatus(currentReading.tempAir, currentPlant.tempMin, currentPlant.tempMax) : 'neutral'} targetRange={currentPlant ? `${formatTemp(currentPlant.tempMin).toFixed(0)}-${formatTemp(currentPlant.tempMax).toFixed(0)}°` : '—'} icon="fa-thermometer-half" isDark={isDarkMode} lang={lang} showTempToggle tempUnit={currentUser.unit} onToggleTempUnit={u => updateProfile({ unit: u })} />
                     <SensorCard label={t('dash_humidity', lang)} value={currentReading.humidity} unit="%" status={currentPlant ? getSensorStatus(currentReading.humidity, currentPlant.humidityMin, currentPlant.humidityMax) : 'neutral'} targetRange={currentPlant ? `${currentPlant.humidityMin}-${currentPlant.humidityMax}%` : '—'} icon="fa-tint" isDark={isDarkMode} lang={lang} />
                     <SensorCard label={t('dash_light', lang)} value={currentReading.light} unit="%" status={currentPlant ? (currentReading.light < currentPlant.lightMin ? 'low' : 'ok') : 'neutral'} targetRange={currentPlant ? `Min ${currentPlant.lightMin}%` : '—'} icon="fa-sun" isDark={isDarkMode} lang={lang} />
                     <SensorCard label={t('dash_ph', lang)} value={currentReading.soilPh} unit="pH" status={currentPlant ? getSensorStatus(currentReading.soilPh, currentPlant.phMin, currentPlant.phMax) : 'neutral'} targetRange={currentPlant ? `${currentPlant.phMin}-${currentPlant.phMax}` : '—'} icon="fa-flask" isDark={isDarkMode} lang={lang} />
@@ -1858,24 +1889,6 @@ const App: React.FC = () => {
                     </div>
 
                     <div className="space-y-2">
-                      <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest ml-1">{t('prof_unit', lang)}</label>
-                      <div className={`flex p-1 rounded-2xl ${isDarkMode ? 'bg-slate-800' : 'bg-slate-100'}`}>
-                        <button 
-                          onClick={() => updateProfile({ unit: 'celsius' })}
-                          className={`flex-1 py-3 rounded-xl font-bold text-sm transition-all ${currentUser.unit === 'celsius' ? 'bg-violet-600 text-white shadow-lg shadow-violet-600/20' : 'text-slate-400'}`}
-                        >
-                          Celsius (°C)
-                        </button>
-                        <button 
-                          onClick={() => updateProfile({ unit: 'fahrenheit' })}
-                          className={`flex-1 py-3 rounded-xl font-bold text-sm transition-all ${currentUser.unit === 'fahrenheit' ? 'bg-violet-600 text-white shadow-lg shadow-violet-600/20' : 'text-slate-400'}`}
-                        >
-                          Fahrenheit (°F)
-                        </button>
-                      </div>
-                    </div>
-
-                    <div className="space-y-2">
                       <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest ml-1">{t('prof_timezone', lang)}</label>
                       <input 
                         type="text" 
@@ -2012,15 +2025,15 @@ const App: React.FC = () => {
 
                       {/* Carte intérieure */}
                       <div
-                        className="relative overflow-hidden rounded-[30px]"
+                        className="relative overflow-hidden rounded-[30px] flex flex-col h-full"
                         style={{ backgroundColor: isUnlinked ? (isDarkMode ? '#1e0a0a' : '#fff5f5') : innerBg }}
                       >
                         {/* Strip de couleur station(s) en haut — arrêts durs bien visibles */}
                         {!isUnlinked && colors.length > 0 && (
-                          <div className="h-2.5 w-full" style={{ background: stripBackground }}></div>
+                          <div className="h-2.5 w-full flex-none" style={{ background: stripBackground }}></div>
                         )}
 
-                      <div className="p-8">
+                      <div className="p-8 flex flex-col flex-1">
                         {/* Header : icône + boutons */}
                         <div className="flex justify-between items-start mb-6">
                           <div
@@ -2066,37 +2079,15 @@ const App: React.FC = () => {
                         )}
 
                         <button
-                          onClick={async () => {
-                            if (selectedDeviceId) {
-                              setDevices(prev => prev.map(d => d.id === selectedDeviceId ? { ...d, currentPlantProfileId: plant.id } : d));
-                              if (backendOnline) {
-                                try {
-                                  await deviceService.setPlantConfig(selectedDeviceId, {
-                                    plant_id: plant.id,
-                                    name: plant.name,
-                                    humidity_min: plant.humidityMin,
-                                    humidity_max: plant.humidityMax,
-                                    temp_min: plant.tempMin,
-                                    temp_max: plant.tempMax,
-                                    light_min: plant.lightMin,
-                                    ph_min: plant.phMin,
-                                    ph_max: plant.phMax,
-                                    notes: plant.notes || '',
-                                  });
-                                } catch { /* fallback local */ }
-                              }
-                              // Refresh immédiat du bac pour avoir des données à jour avec la nouvelle plante
-                              await refreshDevice(selectedDeviceId);
-                              setView('dashboard');
-                            }
-                          }}
-                          className={`w-full py-4 rounded-2xl font-black uppercase tracking-widest transition-all active:scale-95 ${
+                          onClick={() => setView('config')}
+                          className={`mt-auto w-full py-4 rounded-2xl font-black uppercase tracking-widest transition-all active:scale-95 flex items-center justify-center gap-2 ${
                             isUnlinked
                               ? (isDarkMode ? 'bg-rose-500/20 hover:bg-violet-600 text-rose-300 hover:text-white' : 'bg-rose-100 hover:bg-violet-600 text-rose-500 hover:text-white')
                               : (isDarkMode ? 'bg-slate-800 hover:bg-violet-600 text-slate-100' : 'bg-slate-100 hover:bg-violet-600 hover:text-white text-slate-600')
                           }`}
                         >
-                          {t('plant_apply', lang)}
+                          <i className="fas fa-link text-xs"></i>
+                          {t('plant_link_to_bac', lang)}
                         </button>
                       </div>
                       </div>
@@ -2234,7 +2225,7 @@ const App: React.FC = () => {
                                       {/* Assign plant dropdown */}
                                       <select
                                         value={bac.currentPlantProfileId || ''}
-                                        onChange={e => { e.stopPropagation(); setDevices(prev => prev.map(d => d.id === bac.id ? { ...d, currentPlantProfileId: e.target.value || undefined } : d)); }}
+                                        onChange={e => { e.stopPropagation(); const val = e.target.value || undefined; setDevices(prev => prev.map(d => d.id === bac.id ? { ...d, currentPlantProfileId: val } : d)); persistPlantLink(bac.id, val); }}
                                         onClick={e => e.stopPropagation()}
                                         className={`mt-2 w-full text-[9px] rounded-lg p-1 font-bold outline-none cursor-pointer border-0 ${isDarkMode ? 'bg-slate-700 text-slate-300' : 'bg-white text-slate-600'}`}
                                       >
@@ -2380,6 +2371,7 @@ const App: React.FC = () => {
                 setDevices(prev => prev.map(d =>
                   d.id === alert.deviceId ? { ...d, currentPlantProfileId: plant.id } : d
                 ));
+                persistPlantLink(alert.deviceId, plant.id);
               }
               setView('dashboard');
             };
@@ -2692,6 +2684,25 @@ const App: React.FC = () => {
                   <div className={`p-3 rounded-xl flex items-center gap-2 ${isDarkMode ? 'bg-violet-500/10' : 'bg-violet-50'}`}>
                     <i className="fas fa-link text-violet-500 text-xs"></i>
                     <p className={`text-[10px] font-mono truncate ${isDarkMode ? 'text-slate-300' : 'text-slate-600'}`}>{bac.physicalId}</p>
+                  </div>
+                )}
+                {bac.apiKey && (
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest ml-1">
+                      <i className="fas fa-key mr-1"></i>Clé API (ESP32)
+                    </label>
+                    <div className={`flex items-center gap-2 p-3 rounded-2xl ${isDarkMode ? 'bg-slate-800' : 'bg-slate-100'}`}>
+                      <p className={`flex-1 text-[10px] font-mono truncate ${isDarkMode ? 'text-slate-300' : 'text-slate-600'}`}>{bac.apiKey}</p>
+                      <button
+                        onClick={() => {
+                          navigator.clipboard.writeText(bac.apiKey!);
+                        }}
+                        className="flex-shrink-0 text-xs px-2 py-1 rounded-lg bg-violet-600 hover:bg-violet-700 text-white font-bold"
+                        title="Copier la clé"
+                      >
+                        <i className="fas fa-copy"></i>
+                      </button>
+                    </div>
                   </div>
                 )}
               </div>

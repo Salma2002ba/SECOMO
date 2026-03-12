@@ -116,8 +116,8 @@ async def evaluate_reading(
                 type="info",
                 category="light",
                 message=(
-                    f"Luminosité insuffisante : {reading.light:.0f} lux "
-                    f"(seuil min : {config.light_min:.0f} lux). "
+                    f"Luminosité insuffisante : {reading.light:.0f}% "
+                    f"(seuil min : {config.light_min:.0f}%). "
                     f"Pensez à activer les LEDs."
                 ),
             ))

@@ -27,5 +27,7 @@ class SensorReading(Base):
     light: Mapped[float | None] = mapped_column(Float, nullable=True)
     soil_ph: Mapped[float | None] = mapped_column(Float, nullable=True)
     watts: Mapped[float | None] = mapped_column(Float, nullable=True)
+    battery_level: Mapped[float | None] = mapped_column(Float, nullable=True)
+    water_tank_level: Mapped[float | None] = mapped_column(Float, nullable=True)
 
     device = relationship("Device", back_populates="readings")

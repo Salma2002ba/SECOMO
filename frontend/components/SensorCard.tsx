@@ -13,9 +13,12 @@ interface SensorCardProps {
   hidden?: boolean;
   isDark?: boolean;
   lang?: Lang;
+  showTempToggle?: boolean;
+  tempUnit?: 'celsius' | 'fahrenheit';
+  onToggleTempUnit?: (unit: 'celsius' | 'fahrenheit') => void;
 }
 
-const SensorCard: React.FC<SensorCardProps> = ({ label, value, unit, status, targetRange, icon, hidden, isDark, lang = 'FR' as Lang }) => {
+const SensorCard: React.FC<SensorCardProps> = ({ label, value, unit, status, targetRange, icon, hidden, isDark, lang = 'FR' as Lang, showTempToggle, tempUnit, onToggleTempUnit }) => {
   if (hidden) return null;
 
   const statusStyles = {
@@ -32,8 +35,22 @@ const SensorCard: React.FC<SensorCardProps> = ({ label, value, unit, status, tar
     neutral: t('dash_status_inactif', lang),
   };
 
+  const unitLabel = tempUnit === 'celsius' ? 'Celsius (°C)' : 'Fahrenheit (°F)';
+
+  const toggleActiveStyle = isDark ? {
+    ok:      'bg-emerald-400/50 text-white',
+    low:     'bg-amber-400/50 text-white',
+    high:    'bg-rose-400/50 text-white',
+    neutral: 'bg-slate-400/50 text-white',
+  }[status] : {
+    ok:      'bg-emerald-600/40 text-white',
+    low:     'bg-amber-600/40 text-white',
+    high:    'bg-rose-600/40 text-white',
+    neutral: 'bg-slate-600/40 text-white',
+  }[status];
+
   return (
-    <div className={`p-5 rounded-2xl border transition-all duration-300 flex flex-col justify-between h-40 ${statusStyles[status]}`}>
+    <div className={`relative p-5 rounded-2xl border transition-all duration-300 flex flex-col justify-between h-40 ${statusStyles[status]}`}>
       <div className="flex justify-between items-start">
         <div className="flex items-center gap-3">
           <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${isDark ? 'bg-white/5 border-white/10' : 'bg-white/60 border-white/40'} border shadow-sm`}>
@@ -57,6 +74,25 @@ const SensorCard: React.FC<SensorCardProps> = ({ label, value, unit, status, tar
           </p>
         )}
       </div>
+
+      {showTempToggle && onToggleTempUnit && (
+        <div className="absolute bottom-3 right-3 flex items-center gap-1.5">
+          <i
+            className="fas fa-circle-info text-[10px] opacity-40 cursor-help"
+            title={unitLabel}
+          />
+          <div className={`flex items-center rounded-full p-0.5 gap-0.5 ${isDark ? 'bg-white/10' : 'bg-black/10'}`}>
+            <button
+              onClick={e => { e.stopPropagation(); onToggleTempUnit('celsius'); }}
+              className={`px-2 py-0.5 rounded-full text-[9px] font-black transition-all ${tempUnit === 'celsius' ? toggleActiveStyle : 'opacity-40'}`}
+            >°C</button>
+            <button
+              onClick={e => { e.stopPropagation(); onToggleTempUnit('fahrenheit'); }}
+              className={`px-2 py-0.5 rounded-full text-[9px] font-black transition-all ${tempUnit === 'fahrenheit' ? toggleActiveStyle : 'opacity-40'}`}
+            >°F</button>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

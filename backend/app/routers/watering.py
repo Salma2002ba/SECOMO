@@ -78,6 +78,13 @@ async def watering_history(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
+    # Vérifier que le device appartient à l'utilisateur courant
+    device_result = await db.execute(
+        select(Device).where(Device.id == device_id, Device.user_id == current_user.id)
+    )
+    if device_result.scalar_one_or_none() is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Device introuvable")
+
     result = await db.execute(
         select(WateringEvent)
         .where(WateringEvent.device_id == device_id)

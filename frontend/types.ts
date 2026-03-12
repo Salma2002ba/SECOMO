@@ -47,6 +47,7 @@ export interface Station {
 export interface Device {
   id: string;
   name: string;
+  apiKey?: string;
   size: DeviceSize;
   level: DeviceLevel;
   locationLabel: string;

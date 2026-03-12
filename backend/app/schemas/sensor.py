@@ -12,6 +12,8 @@ class SensorReadingIn(BaseModel):
     light: float | None = None
     soil_ph: float | None = None
     watts: float | None = None
+    battery_level: float | None = None
+    water_tank_level: float | None = None
 
 
 class SensorReadingOut(BaseModel):
@@ -25,5 +27,7 @@ class SensorReadingOut(BaseModel):
     light: float | None
     soil_ph: float | None
     watts: float | None
+    battery_level: float | None
+    water_tank_level: float | None
 
     model_config = {"from_attributes": True}

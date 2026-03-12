@@ -93,6 +93,7 @@ const translations = {
   plant_linked: { FR: 'liée(s)', EN: 'linked' },
   plant_unlinked: { FR: 'non liée(s)', EN: 'unlinked' },
   plant_apply: { FR: 'Appliquer au bac sélectionné', EN: 'Apply to selected tank' },
+  plant_link_to_bac: { FR: 'Lié à un bac', EN: 'Link to a tank' },
   plant_edit: { FR: 'Modifier', EN: 'Edit' },
   plant_delete_confirm: { FR: 'Supprimer cette plante ?', EN: 'Delete this plant?' },
   plant_delete_confirm_sub: { FR: 'Les bacs liés perdront leur profil.', EN: 'Linked tanks will lose their profile.' },

@@ -13,6 +13,7 @@ struct SensorData {
     float lightLux;        // lux
     float waterLevelCm;    // cm
     float ph;              // 0-14
+    float batteryLevel;    // % (0-100)
 };
 
 // Initialise tous les capteurs (I2C, pins analogiques, ultrason)
@@ -25,5 +26,6 @@ SensorData sensorsRead();
 float readSoilMoisture(int pin);
 float readWaterLevel();
 float readPH();
+float readBatteryLevel();
 
 #endif // SENSORS_H

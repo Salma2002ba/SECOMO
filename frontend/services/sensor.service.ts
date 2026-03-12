@@ -11,6 +11,8 @@ export interface SensorReadingOut {
   light: number | null;
   soil_ph: number | null;
   watts: number | null;
+  battery_level: number | null;
+  water_tank_level: number | null;
 }
 
 export async function getReadings(

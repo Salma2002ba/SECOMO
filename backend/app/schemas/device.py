@@ -9,6 +9,9 @@ class DeviceCreate(BaseModel):
     size: str = Field(default="Moyen", pattern=r"^(Petit|Moyen|Grand)$")
     level: str = Field(default="Base", pattern=r"^(Base|Intermédiaire|Final)$")
     location_label: str = ""
+    station_id: uuid.UUID | None = None
+    bac_row: int | None = None
+    bac_col: int | None = None
 
 
 class DeviceUpdate(BaseModel):
@@ -42,7 +45,7 @@ class DeviceOut(BaseModel):
 
 class PlantConfigCreate(BaseModel):
     plant_id: uuid.UUID | None = None
-    name: str = Field(min_length=1, max_length=100)
+    name: str = Field(default="", max_length=100)
     humidity_min: float = Field(ge=0, le=100)
     humidity_max: float = Field(ge=0, le=100)
     temp_min: float = Field(ge=-20, le=60)

@@ -69,25 +69,18 @@ bool networkSendSensorData(const SensorData& sensors, const ActuatorState& actua
     String url = String(BACKEND_URL) + ENDPOINT_SENSOR;
     http.begin(url);
     http.addHeader("Content-Type", "application/json");
-    http.addHeader("X-Device-ID", DEVICE_ID);
+    http.addHeader("X-Api-Key", API_KEY);
     http.setTimeout(HTTP_TIMEOUT_MS);
 
-    // Construire le JSON
+    // Construire le JSON au format attendu par SensorReadingIn
     JsonDocument doc;
-    // Timestamp ISO 8601 via NTP (ou uptime si non synchronisé)
-    struct tm timeinfo;
-    char tsBuf[32];
-    if (getLocalTime(&timeinfo)) {
-        strftime(tsBuf, sizeof(tsBuf), "%Y-%m-%dT%H:%M:%SZ", &timeinfo);
-    } else {
-        snprintf(tsBuf, sizeof(tsBuf), "uptime:%lu", millis() / 1000);
-    }
 
-    doc["device_id"] = DEVICE_ID;
-    doc["plant_id"] = PLANT_ID;
-    doc["timestamp"] = tsBuf;
+    // temp_air (BME280)
+    if (sensors.temperature >= 0) doc["temp_air"] = sensors.temperature;
 
-    // Calculer la moyenne humidité sol
+    // humidity_air (BME280) et humidity_soil (moyenne capteurs sol)
+    if (sensors.humidity >= 0) doc["humidity_air"] = sensors.humidity;
+
     float soilAvg = -1.0;
     if (sensors.soilMoisture1 >= 0 && sensors.soilMoisture2 >= 0) {
         soilAvg = (sensors.soilMoisture1 + sensors.soilMoisture2) / 2.0;
@@ -96,44 +89,45 @@ bool networkSendSensorData(const SensorData& sensors, const ActuatorState& actua
     } else if (sensors.soilMoisture2 >= 0) {
         soilAvg = sensors.soilMoisture2;
     }
+    if (soilAvg >= 0) doc["humidity_soil"] = soilAvg;
 
-    JsonObject sensorsObj = doc["sensors"].to<JsonObject>();
-    sensorsObj["soil_moisture_1"] = sensors.soilMoisture1;
-    sensorsObj["soil_moisture_2"] = sensors.soilMoisture2;
-    if (soilAvg >= 0) {
-        sensorsObj["soil_moisture"] = soilAvg;
+    // light : lux → % (capé à LIGHT_MAX_LUX)
+    if (sensors.lightLux >= 0) {
+        float lightPct = (sensors.lightLux / LIGHT_MAX_LUX) * 100.0;
+        if (lightPct > 100.0) lightPct = 100.0;
+        doc["light"] = lightPct;
     }
-    sensorsObj["temperature"] = sensors.temperature;
-    sensorsObj["humidity"] = sensors.humidity;
-    sensorsObj["pressure"] = sensors.pressure;
-    sensorsObj["light_lux"] = sensors.lightLux;
-    sensorsObj["water_level_cm"] = sensors.waterLevelCm;
-    sensorsObj["ph"] = sensors.ph;
 
-    JsonObject actuatorsObj = doc["actuators"].to<JsonObject>();
-    actuatorsObj["pump_main"] = actuators.pumpMain;
-    actuatorsObj["pump_peristaltic"] = actuators.pumpPeristaltic;
-    actuatorsObj["valve_a"] = actuators.valveA;
-    actuatorsObj["valve_b"] = actuators.valveB;
-    actuatorsObj["fan"] = actuators.fan;
-    actuatorsObj["led"] = actuators.led;
+    // soil_ph
+    if (sensors.ph >= 0) doc["soil_ph"] = sensors.ph;
 
-    doc["automation_enabled"] = automationIsEnabled();
+    // water_tank_level : cm → % (hauteur réservoir)
+    if (sensors.waterLevelCm >= 0) {
+        float tankPct = (sensors.waterLevelCm / TANK_HEIGHT_CM) * 100.0;
+        if (tankPct > 100.0) tankPct = 100.0;
+        doc["water_tank_level"] = tankPct;
+    }
+
+    // battery_level
+    if (sensors.batteryLevel >= 0) doc["battery_level"] = sensors.batteryLevel;
 
     String payload;
     serializeJson(doc, payload);
 
     Serial.printf("[NETWORK] POST %s (%d octets)\n", url.c_str(), payload.length());
+    Serial.println("[NETWORK] Payload : " + payload);
 
     int httpCode = http.POST(payload);
 
-    if (httpCode == 200) {
-        Serial.println("[NETWORK] Données envoyées avec succès");
+    if (httpCode == 201) {
+        Serial.println("[NETWORK] Données envoyées avec succès (201)");
         httpFailureCount = 0;
         http.end();
         return true;
     } else {
-        Serial.printf("[NETWORK] Erreur POST : %d\n", httpCode);
+        Serial.printf("[NETWORK] Erreur POST : HTTP %d\n", httpCode);
+        String response = http.getString();
+        Serial.println("[NETWORK] Réponse : " + response);
         httpFailureCount++;
         http.end();
         return false;
@@ -152,7 +146,7 @@ bool networkFetchCommands(String& commandsJson) {
     HTTPClient http;
     String url = String(BACKEND_URL) + ENDPOINT_COMMANDS;
     http.begin(url);
-    http.addHeader("X-Device-ID", DEVICE_ID);
+    http.addHeader("X-Api-Key", API_KEY);
     http.setTimeout(HTTP_TIMEOUT_MS);
 
     Serial.printf("[NETWORK] GET %s\n", url.c_str());

@@ -65,12 +65,15 @@ void sensorsInit() {
         Serial.println("[SENSORS] ERREUR : BME280 non détecté !");
     }
 
-    // BH1750
-    if (lightMeter.begin(BH1750::CONTINUOUS_HIGH_RES_MODE)) {
+    // BH1750 — essai adresse 0x23 (ADD=GND) puis 0x5C (ADD=VCC)
+    if (lightMeter.begin(BH1750::CONTINUOUS_HIGH_RES_MODE, 0x23)) {
         bh1750Ready = true;
-        Serial.println("[SENSORS] BH1750 détecté");
+        Serial.println("[SENSORS] BH1750 détecté (adresse 0x23)");
+    } else if (lightMeter.begin(BH1750::CONTINUOUS_HIGH_RES_MODE, 0x5C)) {
+        bh1750Ready = true;
+        Serial.println("[SENSORS] BH1750 détecté (adresse 0x5C)");
     } else {
-        Serial.println("[SENSORS] ERREUR : BH1750 non détecté !");
+        Serial.println("[SENSORS] ERREUR : BH1750 non détecté (0x23 et 0x5C essayés) !");
     }
 
     // Pins analogiques (pas de config nécessaire sur ESP32, ADC auto)
@@ -97,6 +100,18 @@ float readWaterLevel() {
     float level = TANK_HEIGHT_CM - (float)distanceCm;
     if (level < 0) level = 0;
     return level;
+}
+
+float readBatteryLevel() {
+    int raw = analogRead(PIN_BATTERY_ADC);
+    if (raw <= 0) return -1.0;
+    // ADC → tension réelle (pont diviseur)
+    float voltage = ((float)raw / 4095.0) * 3.3 * BATT_DIVIDER_RATIO;
+    // Tension → pourcentage
+    float pct = (voltage - BATT_EMPTY_V) / (BATT_FULL_V - BATT_EMPTY_V) * 100.0;
+    if (pct < 0.0) pct = 0.0;
+    if (pct > 100.0) pct = 100.0;
+    return pct;
 }
 
 float readPH() {
@@ -128,7 +143,7 @@ SensorData sensorsRead() {
 
     // --- Humidité sol (avec moyenne glissante) ---
     float soil1 = readSoilMoisture(PIN_SOIL_MOISTURE_1);
-    float soil2 = readSoilMoisture(PIN_SOIL_MOISTURE_2);
+    float soil2 = (PIN_SOIL_MOISTURE_2 >= 0) ? readSoilMoisture(PIN_SOIL_MOISTURE_2) : -1.0;
 
     if (soil1 >= 0) {
         soilBuffer1[soilBufferIndex] = soil1;
@@ -172,10 +187,13 @@ SensorData sensorsRead() {
     // --- pH ---
     data.ph = readPH();
 
+    // --- Batterie ---
+    data.batteryLevel = readBatteryLevel();
+
     // Log
-    Serial.printf("[SENSORS] T=%.1f°C H=%.1f%% P=%.1fhPa Lux=%.0f Sol1=%.1f%% Sol2=%.1f%% Eau=%.1fcm pH=%.1f\n",
+    Serial.printf("[SENSORS] T=%.1f°C H=%.1f%% P=%.1fhPa Lux=%.0f Sol1=%.1f%% Sol2=%.1f%% Eau=%.1fcm pH=%.1f Batt=%.0f%%\n",
         data.temperature, data.humidity, data.pressure, data.lightLux,
-        data.soilMoisture1, data.soilMoisture2, data.waterLevelCm, data.ph);
+        data.soilMoisture1, data.soilMoisture2, data.waterLevelCm, data.ph, data.batteryLevel);
 
     return data;
 }

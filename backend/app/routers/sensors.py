@@ -20,6 +20,18 @@ from app.utils.websocket_manager import ws_manager
 
 logger = logging.getLogger(__name__)
 
+# --- Log fichier ESP32 ---
+import os
+from datetime import datetime
+ESP_LOG_FILE = os.path.join(os.path.dirname(__file__), '..', '..', 'esp32_data.log')
+
+def log_esp_data(device_name: str, data: dict):
+    line = f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] {device_name} | "
+    line += " | ".join(f"{k}={v}" for k, v in data.items() if v is not None)
+    with open(ESP_LOG_FILE, 'a', encoding='utf-8') as f:
+        f.write(line + '\n')
+    print(f"[ESP32 LOG] {line}")
+
 router = APIRouter(tags=["sensors"])
 
 
@@ -38,6 +50,9 @@ async def post_reading(
     device.is_online = True
     device.last_seen_at = datetime.now(timezone.utc)
     await db.flush()
+
+    # Log fichier
+    log_esp_data(device.name, body.model_dump(exclude_none=True))
 
     # --- Pipeline Phase 2-3 ---
 
@@ -95,6 +110,14 @@ async def get_readings(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
+    # Vérifier que le device appartient à l'utilisateur courant
+    device_result = await db.execute(
+        select(Device).where(Device.id == device_id, Device.user_id == current_user.id)
+    )
+    if device_result.scalar_one_or_none() is None:
+        from fastapi import HTTPException, status
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Device introuvable")
+
     result = await db.execute(
         select(SensorReading)
         .where(SensorReading.device_id == device_id)
