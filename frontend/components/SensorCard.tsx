@@ -70,7 +70,7 @@ const SensorCard: React.FC<SensorCardProps> = ({ label, value, unit, status, tar
         </div>
         {targetRange && (
           <p className="text-[10px] mt-2 font-medium opacity-50 flex items-center gap-1">
-            <i className="fas fa-bullseye"></i> Target: {targetRange}
+            <i className="fas fa-bullseye"></i> {t('sensor_target_label', lang)} : {targetRange}
           </p>
         )}
       </div>

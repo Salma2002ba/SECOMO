@@ -58,7 +58,7 @@ const HistoryChart: React.FC<HistoryChartProps> = ({ data, isDark, lang = 'FR' a
           <Line 
             type="monotone" 
             dataKey="tempAir" 
-            name="Temp. Air" 
+            name={t('chart_temp_air', lang)}
             stroke="#f59e0b" 
             strokeWidth={2} 
             dot={false} 

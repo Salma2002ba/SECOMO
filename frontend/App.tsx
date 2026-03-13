@@ -1668,7 +1668,7 @@ const App: React.FC = () => {
 
               {/* Colonne droite */}
               <div className="space-y-8">
-                <WeatherWidget isDark={isDarkMode} />
+                <WeatherWidget isDark={isDarkMode} lang={lang} />
                 <div className={`${cardClasses} p-8 rounded-[32px] border shadow-sm`}>
                   <h3 className={`text-lg font-black mb-6 ${isDarkMode ? 'text-slate-100' : 'text-slate-800'}`}>{t('dash_cultivated_plant', lang)}</h3>
                   {currentPlant ? (
@@ -2191,7 +2191,7 @@ const App: React.FC = () => {
                           {swapSourceBacId && (
                             <p className="text-xs font-bold text-amber-500 flex items-center gap-2">
                               <i className="fas fa-arrows-rotate"></i>
-                              {lang === 'FR' ? 'Bac sélectionné' : 'Tank selected'} : <span className="text-amber-400">{devices.find(d => d.id === swapSourceBacId)?.name}</span> — {t('cfg_bac_swap_hint', lang)}
+                              {t('cfg_bac_selected', lang)} : <span className="text-amber-400">{devices.find(d => d.id === swapSourceBacId)?.name}</span> — {t('cfg_bac_swap_hint', lang)}
                               <button onClick={() => setSwapSourceBacId(null)} className="ml-2 text-slate-400 hover:text-slate-200"><i className="fas fa-times"></i></button>
                             </p>
                           )}

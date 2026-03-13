@@ -1,15 +1,17 @@
 
 import React, { useState, useEffect } from 'react';
 import { WeatherData } from '../types';
+import { t, type Lang } from '../i18n';
 
 interface WeatherWidgetProps {
   isDark?: boolean;
+  lang?: Lang;
 }
 
-const WeatherWidget: React.FC<WeatherWidgetProps> = ({ isDark }) => {
+const WeatherWidget: React.FC<WeatherWidgetProps> = ({ isDark, lang = 'FR' as Lang }) => {
   const [weather, setWeather] = useState<WeatherData | null>(null);
   const [loading, setLoading] = useState(true);
-  const [city, setCity] = useState('Votre position');
+  const [city, setCity] = useState('');
 
   useEffect(() => {
     const fetchWeatherByCoords = async (lat: number, lon: number, cityName: string) => {
@@ -28,7 +30,7 @@ const WeatherWidget: React.FC<WeatherWidgetProps> = ({ isDark }) => {
         setCity(cityName);
         setWeather({
           temp: data.current_weather.temperature,
-          description: 'Variable',
+          description: '',
           icon,
           precipProb: data.daily?.precipitation_probability_max?.[0] ?? 0,
           city: cityName,
@@ -46,7 +48,7 @@ const WeatherWidget: React.FC<WeatherWidgetProps> = ({ isDark }) => {
         async (pos) => {
           const { latitude, longitude } = pos.coords;
           // Reverse geocode via Open-Meteo geocoding (no key needed)
-          let cityName = 'Votre position';
+          let cityName = t('weather_your_location', lang);
           try {
             const geo = await fetch(
               `https://nominatim.openstreetmap.org/reverse?lat=${latitude}&lon=${longitude}&format=json`
@@ -57,7 +59,7 @@ const WeatherWidget: React.FC<WeatherWidgetProps> = ({ isDark }) => {
               geoData.address?.town ||
               geoData.address?.village ||
               geoData.address?.county ||
-              'Votre position';
+              t('weather_your_location', lang);
           } catch { /* use default */ }
           fetchWeatherByCoords(latitude, longitude, cityName);
         },
@@ -92,12 +94,12 @@ const WeatherWidget: React.FC<WeatherWidgetProps> = ({ isDark }) => {
         <div className="mt-4 flex items-center gap-3 flex-wrap">
           <div className="bg-white/20 px-3 py-1 rounded-full text-xs font-semibold backdrop-blur-sm">
             <i className="fas fa-droplet mr-2"></i>
-            {weather?.precipProb}% pluie
+            {weather?.precipProb}% {t('weather_rain', lang)}
           </div>
           {needsLessWater && (
             <div className="bg-amber-400 text-amber-950 px-3 py-1 rounded-full text-xs font-bold animate-pulse">
               <i className="fas fa-exclamation-triangle mr-2"></i>
-              Arrosage réduit conseillé
+              {t('weather_reduced_watering', lang)}
             </div>
           )}
         </div>

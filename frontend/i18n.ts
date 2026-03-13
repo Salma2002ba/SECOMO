@@ -257,6 +257,18 @@ const translations = {
   chart_title: { FR: 'Historique (Dernière Heure)', EN: 'History (Last Hour)' },
   chart_humidity: { FR: 'Humidité', EN: 'Humidity' },
   chart_ph: { FR: 'pH Sol', EN: 'Soil pH' },
+  chart_temp_air: { FR: 'Temp. Air', EN: 'Air Temp.' },
+
+  // Sensor card
+  sensor_target_label: { FR: 'Cible', EN: 'Target' },
+
+  // Weather widget
+  weather_your_location: { FR: 'Votre position', EN: 'Your location' },
+  weather_rain: { FR: 'pluie', EN: 'rain' },
+  weather_reduced_watering: { FR: 'Arrosage réduit conseillé', EN: 'Reduced watering advised' },
+
+  // Config swap
+  cfg_bac_selected: { FR: 'Bac sélectionné', EN: 'Selected tank' },
 
   // Simulation / backend status
   sim_mode: { FR: '⚡ Mode simulation', EN: '⚡ Simulation mode' },
