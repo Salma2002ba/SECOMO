@@ -1922,7 +1922,7 @@ const App: React.FC = () => {
             const STATION_PALETTE = [
               { hex: '#10b981', light: '#d1fae5', border: '#10b981', text: '#059669', label: 'emerald' },
               { hex: '#3b82f6', light: '#dbeafe', border: '#3b82f6', text: '#2563eb', label: 'blue' },
-              { hex: '#22c55e', light: '#dcfce7', border: '#22c55e', text: '#16a34a', label: 'green' },
+              { hex: '#8b5cf6', light: '#ede9fe', border: '#8b5cf6', text: '#7c3aed', label: 'violet' },
               { hex: '#f59e0b', light: '#fef3c7', border: '#f59e0b', text: '#d97706', label: 'amber' },
               { hex: '#ec4899', light: '#fce7f3', border: '#ec4899', text: '#db2777', label: 'pink' },
               { hex: '#06b6d4', light: '#cffafe', border: '#06b6d4', text: '#0891b2', label: 'cyan' },
