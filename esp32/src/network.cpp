@@ -91,11 +91,9 @@ bool networkSendSensorData(const SensorData& sensors, const ActuatorState& actua
     }
     if (soilAvg >= 0) doc["humidity_soil"] = soilAvg;
 
-    // light : lux → % (capé à LIGHT_MAX_LUX)
+    // light : lux bruts (BH1750, 0–65535 lux)
     if (sensors.lightLux >= 0) {
-        float lightPct = (sensors.lightLux / LIGHT_MAX_LUX) * 100.0;
-        if (lightPct > 100.0) lightPct = 100.0;
-        doc["light"] = lightPct;
+        doc["light"] = sensors.lightLux;
     }
 
     // soil_ph

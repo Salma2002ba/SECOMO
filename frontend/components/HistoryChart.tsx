@@ -29,9 +29,15 @@ const HistoryChart: React.FC<HistoryChartProps> = ({ data, isDark, lang = 'FR' a
   const textColor = isDark ? '#64748b' : '#94a3b8';
 
   return (
-    <div className={`w-full h-80 p-4 rounded-2xl border transition-colors ${isDark ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-100'}`}>
+    <div className={`w-full p-4 rounded-2xl border transition-colors ${isDark ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-100'}`}>
       <h3 className={`text-lg font-semibold mb-4 transition-colors ${isDark ? 'text-slate-200' : 'text-slate-700'}`}>{t('chart_title', lang)}</h3>
-      <ResponsiveContainer width="100%" height="100%">
+      {formattedData.length === 0 ? (
+        <div style={{ height: 220 }} className="flex items-center justify-center text-slate-400 text-sm">
+          <i className="fas fa-chart-line mr-2 opacity-40"></i>
+          {lang === 'FR' ? 'Pas encore de données' : 'No data yet'}
+        </div>
+      ) : (
+      <ResponsiveContainer width="100%" height={220} debounce={50} minWidth={0}>
         <LineChart data={formattedData}>
           <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={gridColor} />
           <XAxis 
@@ -84,6 +90,7 @@ const HistoryChart: React.FC<HistoryChartProps> = ({ data, isDark, lang = 'FR' a
           />
         </LineChart>
       </ResponsiveContainer>
+      )}
     </div>
   );
 };

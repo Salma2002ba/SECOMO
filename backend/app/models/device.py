@@ -34,7 +34,7 @@ class Device(Base):
     )
     bac_row: Mapped[int | None] = mapped_column(Integer, nullable=True)
     bac_col: Mapped[int | None] = mapped_column(Integer, nullable=True)
-    automation_enabled: Mapped[bool] = mapped_column(Boolean, default=False)
+    automation_enabled: Mapped[bool] = mapped_column(Boolean, default=True)
     is_online: Mapped[bool] = mapped_column(Boolean, default=False)
     last_seen_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     created_at: Mapped[datetime] = mapped_column(

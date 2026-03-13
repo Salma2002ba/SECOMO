@@ -215,6 +215,12 @@ const translations = {
   ctrl_light_turn_off: { FR: 'Éteindre', EN: 'Turn off' },
   ctrl_light_turn_on: { FR: 'Allumer', EN: 'Turn on' },
 
+  // Config modal — fuseau nuit
+  cfg_night_range: { FR: 'Plage nuit (lumière ignorée)', EN: 'Night range (light ignored)' },
+  cfg_night_start: { FR: 'Début nuit', EN: 'Night start' },
+  cfg_night_end: { FR: 'Fin nuit', EN: 'Night end' },
+  cfg_night_range_hint: { FR: 'Pendant cette plage, les alertes et le statut de luminosité sont désactivés.', EN: 'During this range, light alerts and status are disabled.' },
+
   // Config modal
   cfg_grid_size: { FR: 'Taille de la grille', EN: 'Grid size' },
   cfg_grid_rows: { FR: 'Lignes', EN: 'Rows' },
@@ -314,8 +320,11 @@ const translations = {
   plant_form_humidity_tip: { FR: "Le taux d'eau dans la terre. 0% = terre complètement sèche, 100% = saturée d'eau. La plupart des plantes poussent bien entre 40% et 70%.", EN: 'Water content in the soil. 0% = completely dry, 100% = saturated. Most plants grow well between 40% and 70%.' },
   plant_form_temp: { FR: 'Température (°C)', EN: 'Temperature (°C)' },
   plant_form_temp_tip: { FR: "Plage de température tolérée. En dessous du min ou au-dessus du max, la croissance ralentit ou la plante souffre. Intérieur classique : 18-25°C.", EN: 'Tolerated temperature range. Below min or above max, growth slows or the plant suffers. Typical indoor range: 18-25°C.' },
-  plant_form_light: { FR: 'Lumière minimum (%)', EN: 'Minimum light (%)' },
-  plant_form_light_tip: { FR: "Intensité lumineuse minimale. 30-40% = mi-ombre (salades, menthe), 60-80% = plein soleil (tomates, piments). En dessous, les LEDs horticoles s'activeront automatiquement.", EN: 'Minimum light intensity. 30-40% = partial shade (lettuce, mint), 60-80% = full sun (tomatoes, peppers). Below this, horticultural LEDs will activate automatically.' },
+  plant_form_light: { FR: 'Luminosité (lux)', EN: 'Light (lux)' },
+  plant_form_light_min: { FR: 'Min', EN: 'Min' },
+  plant_form_light_optimal: { FR: 'Optimal', EN: 'Optimal' },
+  plant_form_light_max: { FR: 'Max', EN: 'Max' },
+  plant_form_light_tip: { FR: "Plage lumineuse en lux. Min = seuil bas (LEDs s'activent en dessous), Optimal = cible idéale, Max = seuil haut (alerte brûlure au-delà). Ref : 1500 lux = mi-ombre, 6000 = lumière vive, 15000 = plein soleil.", EN: "Light range in lux. Min = low threshold (LEDs activate below), Optimal = ideal target, Max = high threshold (burn alert above). Ref: 1500 lux = partial shade, 6000 = bright light, 15000 = full sun." },
   plant_form_ph: { FR: 'pH du sol', EN: 'Soil pH' },
   plant_form_ph_tip: { FR: "Acidité du sol, de 0 (très acide) à 14 (très basique). Potager classique : 6.0-7.0 (légèrement acide à neutre). Fraises et myrtilles préfèrent un sol plus acide (5.0-6.0).", EN: 'Soil acidity, from 0 (very acidic) to 14 (very alkaline). Typical garden: 6.0-7.0 (slightly acidic to neutral). Strawberries and blueberries prefer more acidic soil (5.0-6.0).' },
   plant_not_assigned: { FR: 'Non assignée à un bac', EN: 'Not assigned to a tank' },
@@ -377,7 +386,7 @@ export function translatePlantName(name: string, lang: Lang): string {
 // Messages dynamiques d'alertes
 // ---------------------------------------------------------------------------
 export function alertMsg(
-  category: 'humidity_low' | 'humidity_high' | 'temp_low' | 'temp_high' | 'ph_low' | 'ph_high' | 'light_low' | 'battery_low' | 'water_tank_low',
+  category: 'humidity_low' | 'humidity_high' | 'temp_low' | 'temp_high' | 'ph_low' | 'ph_high' | 'light_low' | 'light_high' | 'battery_low' | 'water_tank_low',
   values: { val: number; threshold: number; plantName: string },
   lang: Lang,
 ): string {
@@ -392,7 +401,8 @@ export function alertMsg(
       case 'temp_high':      return `High temperature: ${v.toFixed(1)}°C (max ${thr}°C for ${name})`;
       case 'ph_low':         return `Low soil pH: ${v.toFixed(1)} (min ${thr} for ${name})`;
       case 'ph_high':        return `High soil pH: ${v.toFixed(1)} (max ${thr} for ${name})`;
-      case 'light_low':      return `Insufficient light: ${v.toFixed(0)}% (min ${thr}% for ${name}). Consider activating the LEDs.`;
+      case 'light_low':      return `Insufficient light: ${v.toFixed(0)} lux (min ${thr} lux for ${name}). Consider activating the LEDs.`;
+      case 'light_high':     return `Excessive light: ${v.toFixed(0)} lux (max ${thr} lux for ${name}). Risk of leaf burn.`;
       case 'battery_low':    return `Low battery: ${v.toFixed(0)}% — replace soon.`;
       case 'water_tank_low': return `Water tank low: ${v.toFixed(0)}% remaining — refill the tank.`;
     }
@@ -404,7 +414,8 @@ export function alertMsg(
     case 'temp_high':      return `Température élevée : ${v.toFixed(1)}°C (max ${thr}°C pour ${name})`;
     case 'ph_low':         return `pH sol bas : ${v.toFixed(1)} (min ${thr} pour ${name})`;
     case 'ph_high':        return `pH sol élevé : ${v.toFixed(1)} (max ${thr} pour ${name})`;
-    case 'light_low':      return `Lumière insuffisante : ${v.toFixed(0)}% (min ${thr}% pour ${name}). Pensez à activer les LEDs.`;
+    case 'light_low':      return `Lumière insuffisante : ${v.toFixed(0)} lux (min ${thr} lux pour ${name}). Pensez à activer les LEDs.`;
+    case 'light_high':     return `Luminosité excessive : ${v.toFixed(0)} lux (max ${thr} lux pour ${name}). Risque de brûlure foliaire.`;
     case 'battery_low':    return `Batterie faible : ${v.toFixed(0)}% — remplacez-la rapidement.`;
     case 'water_tank_low': return `Réservoir bas : ${v.toFixed(0)}% restant — remplissez le réservoir.`;
   }
@@ -414,7 +425,7 @@ export function alertMsg(
 // Messages dynamiques de recommandations
 // ---------------------------------------------------------------------------
 export function recMsg(
-  id: 'r1' | 'r2' | 'r3' | 'r4' | 'r5' | 'r6' | 'r7' | 'r8' | 'r9' | 'r10' | 'r11' | 'r12' | 'r13' | 'r14' | 'r15',
+  id: 'r1' | 'r2' | 'r3' | 'r4' | 'r5' | 'r5h' | 'r6' | 'r6h' | 'r7' | 'r8' | 'r9' | 'r10' | 'r11' | 'r12' | 'r13' | 'r14' | 'r15',
   val: number,
   lang: Lang,
 ): string {
@@ -424,8 +435,10 @@ export function recMsg(
       case 'r2':  return `Soil too wet (${val.toFixed(0)}%): pause watering.`;
       case 'r3':  return `Temperature too high (${val.toFixed(1)}°C): activate ventilation.`;
       case 'r4':  return `Temperature too low (${val.toFixed(1)}°C): protect the plant from cold.`;
-      case 'r5':  return `Insufficient light (${val.toFixed(0)}%): activate LED lighting.`;
-      case 'r6':  return `Insufficient light (${val.toFixed(0)}%) even with automatic lighting. Consider moving the tank to a brighter area.`;
+      case 'r5':  return `Insufficient light (${val.toFixed(0)} lux): activate LED lighting.`;
+      case 'r5h': return `Excessive light (${val.toFixed(0)} lux): shade the tank to avoid leaf burn.`;
+      case 'r6':  return `Insufficient light (${val.toFixed(0)} lux) even with automatic lighting. Consider moving the tank to a brighter area.`;
+      case 'r6h': return `Excessive light (${val.toFixed(0)} lux): move the tank to a less exposed area.`;
       case 'r7':  return `Soil pH too low (${val.toFixed(1)}): add crushed limestone or dolomite to raise the pH.`;
       case 'r8':  return `Soil pH too high (${val.toFixed(1)}): add sulfur or organic compost to lower the pH.`;
       case 'r9':  return `Soil pH critical (${val.toFixed(1)}): very acid soil inhibits nutrient uptake. Urgent correction needed.`;
@@ -442,8 +455,10 @@ export function recMsg(
     case 'r2':  return `Sol trop humide (${val.toFixed(0)}%) : suspendez l'arrosage.`;
     case 'r3':  return `Température trop élevée (${val.toFixed(1)}°C) : activez la ventilation.`;
     case 'r4':  return `Température trop basse (${val.toFixed(1)}°C) : protégez la plante du froid.`;
-    case 'r5':  return `Lumière insuffisante (${val.toFixed(0)}%) : activez l'éclairage LED.`;
-    case 'r6':  return `Lumière insuffisante (${val.toFixed(0)}%) même avec éclairage automatique. Envisagez de déplacer le bac vers une zone plus lumineuse.`;
+    case 'r5':  return `Lumière insuffisante (${val.toFixed(0)} lux) : activez l'éclairage LED.`;
+    case 'r5h': return `Luminosité excessive (${val.toFixed(0)} lux) : ombragez le bac pour éviter les brûlures foliaires.`;
+    case 'r6':  return `Lumière insuffisante (${val.toFixed(0)} lux) même avec éclairage automatique. Envisagez de déplacer le bac vers une zone plus lumineuse.`;
+    case 'r6h': return `Luminosité excessive (${val.toFixed(0)} lux) : déplacez le bac dans une zone moins exposée.`;
     case 'r7':  return `pH sol trop bas (${val.toFixed(1)}) : ajoutez du calcaire broyé ou de la dolomite pour remonter le pH.`;
     case 'r8':  return `pH sol trop élevé (${val.toFixed(1)}) : ajoutez du soufre ou du compost organique pour abaisser le pH.`;
     case 'r9':  return `pH sol critique (${val.toFixed(1)}) : sol très acide, l'absorption des nutriments est bloquée. Correction urgente.`;

@@ -28,6 +28,8 @@ class PlantConfig(Base):
     temp_min: Mapped[float] = mapped_column(Float, nullable=False)
     temp_max: Mapped[float] = mapped_column(Float, nullable=False)
     light_min: Mapped[float] = mapped_column(Float, nullable=False)
+    light_optimal: Mapped[float] = mapped_column(Float, nullable=False, default=0)
+    light_max: Mapped[float] = mapped_column(Float, nullable=False, default=0)
     ph_min: Mapped[float] = mapped_column(Float, nullable=False)
     ph_max: Mapped[float] = mapped_column(Float, nullable=False)
     notes: Mapped[str | None] = mapped_column(Text, default="")

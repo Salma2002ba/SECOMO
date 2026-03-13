@@ -51,6 +51,8 @@ class PlantConfigCreate(BaseModel):
     temp_min: float = Field(ge=-20, le=60)
     temp_max: float = Field(ge=-20, le=60)
     light_min: float = Field(ge=0)
+    light_optimal: float = Field(ge=0, default=0)
+    light_max: float = Field(ge=0, default=0)
     ph_min: float = Field(ge=0, le=14)
     ph_max: float = Field(ge=0, le=14)
     notes: str = ""
@@ -66,6 +68,8 @@ class PlantConfigOut(BaseModel):
     temp_min: float
     temp_max: float
     light_min: float
+    light_optimal: float
+    light_max: float
     ph_min: float
     ph_max: float
     notes: str | None

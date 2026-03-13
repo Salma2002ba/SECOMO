@@ -1,6 +1,6 @@
 import uuid
 from datetime import datetime, timezone
-from sqlalchemy import String, DateTime, ForeignKey
+from sqlalchemy import String, DateTime, ForeignKey, Integer
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.database import Base
@@ -15,6 +15,8 @@ class Station(Base):
     )
     name: Mapped[str] = mapped_column(String(100), nullable=False)
     location_label: Mapped[str] = mapped_column(String(200), default="")
+    night_start: Mapped[int] = mapped_column(Integer, nullable=False, default=22)
+    night_end: Mapped[int] = mapped_column(Integer, nullable=False, default=6)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=lambda: datetime.now(timezone.utc)
     )

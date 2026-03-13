@@ -42,6 +42,8 @@ export interface Station {
   createdAt: string;
   gridRows: number;
   gridCols: number;
+  nightStart: number;
+  nightEnd: number;
 }
 
 export interface Device {
@@ -98,6 +100,8 @@ export interface PlantProfile {
   tempMin: number;
   tempMax: number;
   lightMin: number;
+  lightOptimal: number;
+  lightMax: number;
   phMin: number;
   phMax: number;
   notes: string;

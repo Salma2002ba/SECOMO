@@ -4,6 +4,8 @@ Compare chaque lecture capteur aux seuils de la plant_config du device.
 Génère des alertes info / warning / critical selon les écarts.
 """
 
+from datetime import datetime, timezone
+
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -11,6 +13,15 @@ from app.models.alert import Alert
 from app.models.device import Device
 from app.models.plant_config import PlantConfig
 from app.models.sensor_reading import SensorReading
+from app.models.station import Station
+
+
+def _is_night(night_start: int, night_end: int) -> bool:
+    """Retourne True si l'heure courante est dans la plage nuit."""
+    hour = datetime.now(timezone.utc).hour
+    if night_start > night_end:  # chevauchement minuit (ex: 22h→6h)
+        return hour >= night_start or hour < night_end
+    return night_start <= hour < night_end
 
 
 async def evaluate_reading(
@@ -30,6 +41,16 @@ async def evaluate_reading(
 
     if config is None:
         return []  # Pas de config plante → pas d'alertes
+
+    # Récupérer le fuseau nuit de la station du device
+    night = False
+    if device.station_id:
+        station_result = await db.execute(
+            select(Station).where(Station.id == device.station_id)
+        )
+        station = station_result.scalar_one_or_none()
+        if station:
+            night = _is_night(station.night_start, station.night_end)
 
     alerts: list[Alert] = []
 
@@ -108,17 +129,30 @@ async def evaluate_reading(
                 ),
             ))
 
-    # --- Luminosité ---
-    if reading.light is not None:
+    # --- Luminosité (ignorée la nuit) ---
+    if reading.light is not None and not night:
         if reading.light < config.light_min:
             alerts.append(Alert(
                 device_id=device.id,
                 type="info",
                 category="light",
                 message=(
-                    f"Luminosité insuffisante : {reading.light:.0f}% "
-                    f"(seuil min : {config.light_min:.0f}%). "
+                    f"Luminosité insuffisante : {reading.light:.0f} lux "
+                    f"(seuil min : {config.light_min:.0f} lux). "
                     f"Pensez à activer les LEDs."
+                ),
+            ))
+        elif config.light_max > 0 and reading.light > config.light_max:
+            excess = reading.light - config.light_max
+            severity = "critical" if excess > config.light_max * 0.2 else "warning"
+            alerts.append(Alert(
+                device_id=device.id,
+                type=severity,
+                category="light",
+                message=(
+                    f"Luminosité excessive : {reading.light:.0f} lux "
+                    f"(seuil max : {config.light_max:.0f} lux). "
+                    f"Risque de brûlure foliaire."
                 ),
             ))
 

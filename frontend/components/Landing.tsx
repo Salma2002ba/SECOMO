@@ -62,10 +62,11 @@ const Landing: React.FC<LandingProps> = ({ onNavigate }) => {
                 <i className="fas fa-arrow-right text-sm group-hover:translate-x-1 transition-transform duration-300" />
               </button>
               <button
-                onClick={() => onNavigate('login')}
-                className="bg-zinc-800/80 hover:bg-zinc-700/80 border border-zinc-600/50 hover:border-green-500/40 text-zinc-200 hover:text-green-200 px-8 py-4 rounded-2xl text-base font-bold transition-all duration-300 hover:scale-[1.02] active:scale-[0.98] flex items-center justify-center"
+                onClick={() => document.getElementById('how-it-works')?.scrollIntoView({ behavior: 'smooth' })}
+                className="bg-zinc-800/80 hover:bg-zinc-700/80 border border-zinc-600/50 hover:border-green-500/40 text-zinc-200 hover:text-green-200 px-8 py-4 rounded-2xl text-base font-bold transition-all duration-300 hover:scale-[1.02] active:scale-[0.98] flex items-center justify-center gap-3"
               >
                 Voir la démo
+                <i className="fas fa-chevron-down text-sm" />
               </button>
             </div>
           </div>
@@ -133,7 +134,7 @@ const Landing: React.FC<LandingProps> = ({ onNavigate }) => {
       </section>
 
       {/* How it works */}
-      <section className="py-24 px-6">
+      <section id="how-it-works" className="py-24 px-6">
         <div className="max-w-7xl mx-auto">
           <div className="relative rounded-3xl bg-gradient-to-br from-zinc-800 to-zinc-900 border border-zinc-700/50 p-12 lg:p-16 overflow-hidden">
             <div className="absolute top-0 right-0 w-96 h-96 bg-green-500/10 rounded-full blur-3xl pointer-events-none" />
@@ -178,27 +179,96 @@ const Landing: React.FC<LandingProps> = ({ onNavigate }) => {
                   ))}
                 </div>
               </div>
-              <div className="bg-zinc-800/60 backdrop-blur-sm rounded-2xl p-8 border border-zinc-600/50">
-                <div className="flex justify-between items-center mb-6">
-                  <span className="text-xs font-bold uppercase tracking-widest text-green-400/90">
-                    Aperçu dashboard
-                  </span>
-                  <span className="w-2 h-2 rounded-full bg-green-400" />
+              <div className="bg-zinc-800/60 backdrop-blur-sm rounded-2xl p-6 border border-zinc-600/50">
+                {/* Header */}
+                <div className="flex justify-between items-center mb-5">
+                  <span className="text-xs font-bold uppercase tracking-widest text-green-400/90">Aperçu dashboard</span>
+                  <span className="w-2 h-2 rounded-full bg-green-400 animate-pulse" />
                 </div>
-                <div className="space-y-4">
-                  <div className="h-10 bg-zinc-700/50 rounded-xl" />
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="h-20 bg-zinc-700/50 rounded-xl" />
-                    <div className="h-20 bg-zinc-700/50 rounded-xl" />
-                    <div className="h-20 bg-zinc-700/50 rounded-xl" />
-                    <div className="h-20 bg-zinc-700/50 rounded-xl" />
+
+                {/* Bac header */}
+                <div className="flex items-center justify-between bg-zinc-700/40 rounded-xl px-4 py-2.5 mb-4">
+                  <div className="flex items-center gap-2">
+                    <i className="fas fa-seedling text-green-400 text-xs" />
+                    <span className="text-sm font-bold text-white">Bac Tomates</span>
+                    <span className="text-xs text-zinc-500 font-medium">· Serre principale</span>
                   </div>
-                  <div className="h-28 bg-zinc-700/50 rounded-xl" />
+                  <span className="flex items-center gap-1.5 text-xs font-semibold text-green-400">
+                    <span className="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse" />
+                    En ligne
+                  </span>
                 </div>
-                <p className="mt-4 text-xs text-zinc-500 font-medium">
-                  Capteurs · Historique · Météo · Profil plante · Alertes
-                </p>
-                <div className="mt-6 py-3 px-4 bg-green-500/20 border border-green-500/30 rounded-xl text-center font-semibold text-sm text-green-300">
+
+                {/* Sensor cards 2x2 */}
+                <div className="grid grid-cols-2 gap-3 mb-3">
+                  {/* Température */}
+                  <div className="bg-zinc-700/40 rounded-xl p-3.5 border border-zinc-600/30">
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-xs text-zinc-400 font-medium">Température</span>
+                      <i className="fas fa-thermometer-half text-green-400 text-xs" />
+                    </div>
+                    <div className="text-xl font-black text-white">23.4<span className="text-sm font-semibold text-zinc-400 ml-0.5">°C</span></div>
+                    <div className="mt-1.5 flex items-center gap-1">
+                      <span className="w-1.5 h-1.5 rounded-full bg-green-400" />
+                      <span className="text-xs text-green-400 font-semibold">Normal</span>
+                    </div>
+                  </div>
+                  {/* Humidité sol */}
+                  <div className="bg-zinc-700/40 rounded-xl p-3.5 border border-zinc-600/30">
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-xs text-zinc-400 font-medium">Humidité sol</span>
+                      <i className="fas fa-tint text-green-400 text-xs" />
+                    </div>
+                    <div className="text-xl font-black text-white">58<span className="text-sm font-semibold text-zinc-400 ml-0.5">%</span></div>
+                    <div className="mt-1.5 w-full bg-zinc-600/50 rounded-full h-1">
+                      <div className="bg-green-400 h-1 rounded-full" style={{ width: '58%' }} />
+                    </div>
+                  </div>
+                  {/* Luminosité */}
+                  <div className="bg-zinc-700/40 rounded-xl p-3.5 border border-zinc-600/30">
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-xs text-zinc-400 font-medium">Luminosité</span>
+                      <i className="fas fa-sun text-amber-400 text-xs" />
+                    </div>
+                    <div className="text-xl font-black text-white">72<span className="text-sm font-semibold text-zinc-400 ml-0.5">%</span></div>
+                    <div className="mt-1.5 w-full bg-zinc-600/50 rounded-full h-1">
+                      <div className="bg-amber-400 h-1 rounded-full" style={{ width: '72%' }} />
+                    </div>
+                  </div>
+                  {/* pH */}
+                  <div className="bg-zinc-700/40 rounded-xl p-3.5 border border-zinc-600/30">
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-xs text-zinc-400 font-medium">pH sol</span>
+                      <i className="fas fa-flask text-green-400 text-xs" />
+                    </div>
+                    <div className="text-xl font-black text-white">6.8</div>
+                    <div className="mt-1.5 flex items-center gap-1">
+                      <span className="w-1.5 h-1.5 rounded-full bg-green-400" />
+                      <span className="text-xs text-green-400 font-semibold">Optimal</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Réservoir */}
+                <div className="bg-zinc-700/40 rounded-xl p-3.5 border border-zinc-600/30">
+                  <div className="flex items-center justify-between mb-2.5">
+                    <div className="flex items-center gap-2">
+                      <i className="fas fa-fill-drip text-blue-400 text-xs" />
+                      <span className="text-xs text-zinc-400 font-medium">Réservoir d'eau</span>
+                    </div>
+                    <span className="text-sm font-black text-white">65%</span>
+                  </div>
+                  <div className="w-full bg-zinc-600/50 rounded-full h-2">
+                    <div className="bg-gradient-to-r from-blue-500 to-blue-400 h-2 rounded-full transition-all" style={{ width: '65%' }} />
+                  </div>
+                  <div className="mt-2 flex justify-between text-xs text-zinc-500 font-medium">
+                    <span>Dernier arrosage : 14h32</span>
+                    <span>Auto · actif</span>
+                  </div>
+                </div>
+
+                <p className="mt-4 text-xs text-zinc-500 font-medium">Capteurs · Historique · Météo · Profil plante · Alertes</p>
+                <div className="mt-4 py-2.5 px-4 bg-green-500/20 border border-green-500/30 rounded-xl text-center font-semibold text-sm text-green-300">
                   Démonstration interactive après inscription
                 </div>
               </div>
