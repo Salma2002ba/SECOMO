@@ -52,7 +52,7 @@ function apiPlantToProfile(p: plantService.PlantOut): PlantProfile {
     id: p.id, name: p.name,
     humidityMin: p.humidity_min, humidityMax: p.humidity_max,
     tempMin: p.temp_min, tempMax: p.temp_max,
-    lightMin: Math.min(100, p.light_min), phMin: p.ph_min, phMax: p.ph_max,
+    lightMin: p.light_min, phMin: p.ph_min, phMax: p.ph_max,
     notes: p.notes || '',
   };
 }
@@ -1085,7 +1085,9 @@ const App: React.FC = () => {
 
   const applyCatalogPlant = (cp: any) => {
     if (!editingPlant) return;
-    const lightPct = cp.light_max_lux ? Math.round((cp.light_min_lux / cp.light_max_lux) * 100) : 50;
+    // Conversion lux → % sur base 10 000 lux (max capteur BH1750 / ESP32)
+    const MAX_LUX = 10000;
+    const lightPct = cp.light_min_lux ? Math.round((cp.light_min_lux / MAX_LUX) * 100) : 50;
     // Use common name if available, fallback to scientific name
     const commonName = cp.common_names?.[userLang]?.[0] || cp.common_names?.fr?.[0] || cp.common_names?.en?.[0] || '';
     const displayName = commonName
