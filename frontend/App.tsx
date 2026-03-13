@@ -1428,7 +1428,15 @@ const App: React.FC = () => {
         <header className={`sticky top-0 z-40 backdrop-blur-xl border-b px-8 py-4 flex items-center justify-between gap-6 transition-colors ${headerClasses}`}>
           {/* Gauche : titre + station */}
           <div className="flex-shrink-0">
-            <h2 className={`text-3xl font-black capitalize tracking-tight ${isDarkMode ? 'text-slate-100' : 'text-slate-800'}`}>{view === 'profil' ? t('prof_title', lang) : view}</h2>
+            <h2 className={`text-3xl font-black capitalize tracking-tight ${isDarkMode ? 'text-slate-100' : 'text-slate-800'}`}>{
+              view === 'profil'     ? t('prof_title', lang)
+            : view === 'alerts'    ? t('nav_alerts', lang)
+            : view === 'activities'? t('nav_activities', lang)
+            : view === 'plantes'   ? t('nav_plants', lang)
+            : view === 'config'    ? t('nav_config', lang)
+            : view === 'dashboard' ? t('nav_dashboard', lang)
+            : view
+            }</h2>
             <p className="text-slate-400 text-sm font-medium">
               {t('header_station', lang)}: <span className="text-green-500">{stations.find(s => s.id === selectedStationId)?.name || '—'}</span>
             </p>
@@ -2417,7 +2425,7 @@ const App: React.FC = () => {
                 <div className="flex justify-between items-center gap-4 flex-wrap">
                   <p className="text-slate-400 font-medium">
                     {alerts.length > 0
-                      ? `${alerts.length} ${alerts.length > 1 ? t('alert_count_plural', lang) : t('alert_count', lang)} · ${unreadCount > 0 ? `${unreadCount} non lue${unreadCount > 1 ? 's' : ''}` : 'toutes lues'} · ${totalStationsWithAlerts} station${totalStationsWithAlerts > 1 ? 's' : ''}`
+                      ? `${alerts.length} ${alerts.length > 1 ? t('alert_count_plural', lang) : t('alert_count', lang)} · ${unreadCount > 0 ? `${unreadCount} ${unreadCount > 1 ? t('alert_unread_plural', lang) : t('alert_unread_singular', lang)}` : t('alert_all_read', lang)} · ${totalStationsWithAlerts} ${t('header_station', lang).toLowerCase()}${totalStationsWithAlerts > 1 ? 's' : ''}`
                       : t('alert_no_alerts', lang)}
                   </p>
                   {alerts.length > 0 && (
@@ -2466,7 +2474,7 @@ const App: React.FC = () => {
                               )}
                             </div>
                             <span className={`ml-auto text-[10px] font-bold px-3 py-1 rounded-xl ${isDarkMode ? 'bg-rose-500/20 text-rose-400' : 'bg-rose-50 text-rose-500'}`}>
-                              {stationAlertCount} alerte{stationAlertCount > 1 ? 's' : ''}
+                              {stationAlertCount} {stationAlertCount > 1 ? t('alert_count_plural', lang) : t('alert_count', lang)}
                             </span>
                           </div>
 

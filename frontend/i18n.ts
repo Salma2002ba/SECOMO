@@ -270,6 +270,11 @@ const translations = {
   // Config swap
   cfg_bac_selected: { FR: 'Bac sélectionné', EN: 'Selected tank' },
 
+  // Alerts summary
+  alert_unread_singular: { FR: 'non lue', EN: 'unread' },
+  alert_unread_plural:   { FR: 'non lues', EN: 'unread' },
+  alert_all_read:        { FR: 'toutes lues', EN: 'all read' },
+
   // Simulation / backend status
   sim_mode: { FR: '⚡ Mode simulation', EN: '⚡ Simulation mode' },
   sim_offline: { FR: 'Backend hors ligne', EN: 'Backend offline' },
