@@ -52,7 +52,7 @@ function apiPlantToProfile(p: plantService.PlantOut): PlantProfile {
     id: p.id, name: p.name,
     humidityMin: p.humidity_min, humidityMax: p.humidity_max,
     tempMin: p.temp_min, tempMax: p.temp_max,
-    lightMin: p.light_min, phMin: p.ph_min, phMax: p.ph_max,
+    lightMin: Math.min(100, p.light_min), phMin: p.ph_min, phMax: p.ph_max,
     notes: p.notes || '',
   };
 }
