@@ -305,7 +305,7 @@ const translations = {
   qr_scan_title: { FR: "Scanner le QR Code de l'ESP32", EN: 'Scan the ESP32 QR Code' },
   qr_manual_title: { FR: "Code physique de l'ESP32", EN: 'ESP32 physical code' },
   qr_switch_manual: { FR: 'Passer à la saisie manuelle →', EN: 'Switch to manual entry →' },
-  qr_api_hint: { FR: "Trouvez la clé API dans la config de votre ESP32 ou sur l'étiquette du bac.", EN: 'Find the API key in your ESP32 config or on the tank label.' },
+  qr_api_hint: { FR: "Entrez l'adresse MAC de l'ESP32 (visible dans le moniteur série au 1er démarrage, format AA:BB:CC:DD:EE:FF).", EN: 'Enter the MAC address of the ESP32 (visible in the serial monitor on first boot, format AA:BB:CC:DD:EE:FF).' },
   qr_no_support: { FR: 'Votre navigateur ne supporte pas le scan QR. Utilisez la saisie manuelle.', EN: 'Your browser does not support QR scanning. Use manual entry.' },
   qr_camera_denied: { FR: 'Accès à la caméra refusé. Utilisez la saisie manuelle.', EN: 'Camera access denied. Use manual entry.' },
   cfg_create_bac: { FR: 'Créer le bac', EN: 'Create tank' },

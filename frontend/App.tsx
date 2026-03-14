@@ -12,6 +12,7 @@ import Landing from './components/Landing';
 import Auth from './components/Auth';
 import QRScanner from './components/QRScanner';
 import WaterTankCard from './components/WaterTankCard';
+import CookieBanner from './components/CookieBanner';
 
 // --- API Services ---
 import * as authService from './services/auth.service';
@@ -269,7 +270,8 @@ const App: React.FC = () => {
       if (plant.lightMin > 0) return plant.lightMin * 2;
       return 0;
     }).filter(v => v > 0);
-    return maxValues.length > 0 ? Math.max(...maxValues) : 65535;
+    const computed = maxValues.length > 0 ? Math.max(...maxValues) : 65535;
+    return Math.max(computed, 10000); // plancher = LIGHT_MAX_LUX (config.h)
   }, [devices, selectedStationId, plantProfiles]);
 
   const isDarkMode = currentUser?.theme === 'dark';
@@ -1336,7 +1338,7 @@ const App: React.FC = () => {
     let newBacId: string;
     if (backendOnline) {
       try {
-        const created = await deviceService.createDevice({ name, size: 'Moyen', level: 'Base', location_label: '', station_id: stationId, bac_row: row, bac_col: col });
+        const created = await deviceService.createDevice({ name, size: 'Moyen', level: 'Base', location_label: '', station_id: stationId, bac_row: row, bac_col: col, mac_address: newBacPhysicalId.trim().toUpperCase() || null });
         const newBac: Device = {
           id: created.id, name: created.name, size: 'Moyen', level: 'Base',
           locationLabel: '', stationId, bacPosition: { row, col },
@@ -1445,6 +1447,7 @@ const App: React.FC = () => {
 
   return (
     <div className={`min-h-screen flex transition-colors duration-500 ${themeClasses}`}>
+      <CookieBanner isDark={isDarkMode} lang={lang} />
       {/* Botanical Sidebar */}
       <aside className={`w-24 lg:w-72 border-r flex flex-col fixed inset-y-0 z-50 transition-colors ${sidebarClasses}`}>
         <div onClick={() => setView('dashboard')} className="p-8 flex items-center gap-4 cursor-pointer group">
@@ -2850,25 +2853,6 @@ const App: React.FC = () => {
                   <div className={`p-3 rounded-xl flex items-center gap-2 ${isDarkMode ? 'bg-green-500/10' : 'bg-green-50'}`}>
                     <i className="fas fa-link text-green-500 text-xs"></i>
                     <p className={`text-[10px] font-mono truncate ${isDarkMode ? 'text-slate-300' : 'text-slate-600'}`}>{bac.physicalId}</p>
-                  </div>
-                )}
-                {bac.apiKey && (
-                  <div className="space-y-1">
-                    <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest ml-1">
-                      <i className="fas fa-key mr-1"></i>Clé API (ESP32)
-                    </label>
-                    <div className={`flex items-center gap-2 p-3 rounded-2xl ${isDarkMode ? 'bg-slate-800' : 'bg-slate-100'}`}>
-                      <p className={`flex-1 text-[10px] font-mono truncate ${isDarkMode ? 'text-slate-300' : 'text-slate-600'}`}>{bac.apiKey}</p>
-                      <button
-                        onClick={() => {
-                          navigator.clipboard.writeText(bac.apiKey!);
-                        }}
-                        className="flex-shrink-0 text-xs px-2 py-1 rounded-lg bg-green-600 hover:bg-green-700 text-white font-bold"
-                        title="Copier la clé"
-                      >
-                        <i className="fas fa-copy"></i>
-                      </button>
-                    </div>
                   </div>
                 )}
               </div>

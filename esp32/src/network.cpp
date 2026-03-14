@@ -7,7 +7,15 @@
 #include <ArduinoJson.h>
 #include <time.h>
 
-static int httpFailureCount = 0;
+static int    httpFailureCount = 0;
+static String g_deviceMac = "";
+static String g_apiKey    = "";
+
+void networkSetCredentials(const String& mac, const String& apiKey) {
+    g_deviceMac = mac;
+    g_apiKey    = apiKey;
+    Serial.printf("[NETWORK] Credentials chargés. MAC=%s\n", mac.c_str());
+}
 
 // ============================================================
 // Initialisation
@@ -69,7 +77,7 @@ bool networkSendSensorData(const SensorData& sensors, const ActuatorState& actua
     String url = String(BACKEND_URL) + ENDPOINT_SENSOR;
     http.begin(url);
     http.addHeader("Content-Type", "application/json");
-    http.addHeader("X-Api-Key", API_KEY);
+    http.addHeader("X-Api-Key", g_apiKey);
     http.setTimeout(HTTP_TIMEOUT_MS);
 
     // Construire le JSON au format attendu par SensorReadingIn
@@ -144,7 +152,7 @@ bool networkFetchCommands(String& commandsJson) {
     HTTPClient http;
     String url = String(BACKEND_URL) + ENDPOINT_COMMANDS;
     http.begin(url);
-    http.addHeader("X-Api-Key", API_KEY);
+    http.addHeader("X-Api-Key", g_apiKey);
     http.setTimeout(HTTP_TIMEOUT_MS);
 
     Serial.printf("[NETWORK] GET %s\n", url.c_str());

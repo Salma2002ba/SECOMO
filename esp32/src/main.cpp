@@ -7,6 +7,7 @@
 #include "actuators.h"
 #include "network.h"
 #include "automation.h"
+#include "provisioning.h"
 
 // --- Timers ---
 static unsigned long lastSensorReadMs = 0;
@@ -151,14 +152,29 @@ void setup() {
     sensorsInit();
     actuatorsInit();
     automationInit();
-    networkInit();
+    networkInit(); // doit être avant provisioningIsConfigured() (WiFi.mode requis)
 
-    // Tentative de connexion WiFi
+    // Charger les credentials depuis la NVS
+    bool configured = provisioningIsConfigured();
+
+    // Connexion WiFi
     Serial.println("[MAIN] Connexion WiFi...");
-    if (networkConnect()) {
+    bool wifiOk = networkConnect();
+
+    if (wifiOk && !configured) {
+        // Premier démarrage : attendre que l'utilisateur scanne le QR dans l'app
+        provisioningRun();
+        configured = true;
+    }
+
+    if (configured) {
+        networkSetCredentials(provisioningGetMac(), provisioningGetApiKey());
+    }
+
+    if (wifiOk) {
         degradedMode = false;
-        digitalWrite(PIN_STATUS_LED, HIGH); // LED fixe = connecté
-        syncNTP(); // Synchronisation heure réseau
+        digitalWrite(PIN_STATUS_LED, HIGH);
+        syncNTP();
     } else {
         degradedMode = true;
         Serial.println("[MAIN] Mode dégradé activé (pas de WiFi)");

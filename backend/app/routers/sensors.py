@@ -4,6 +4,7 @@ import logging
 from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, Query
+from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -127,3 +128,35 @@ async def get_readings(
     readings = list(result.scalars().all())
     readings.reverse()  # Ordre chronologique
     return readings
+
+
+# ============================================================
+# Provisioning ESP32 (sans authentification)
+# ============================================================
+
+class EspAnnounce(BaseModel):
+    mac: str
+
+
+@router.post("/api/esp/announce", status_code=200)
+async def esp_announce(body: EspAnnounce):
+    """
+    L'ESP32 annonce sa présence au démarrage.
+    Permet de vérifier que le backend est joignable avant le provisioning.
+    """
+    return {"status": "ok", "mac": body.mac.upper()}
+
+
+@router.get("/api/esp/claim")
+async def esp_claim(mac: str, db: AsyncSession = Depends(get_db)):
+    """
+    L'ESP32 poll cette route avec son adresse MAC.
+    Retourne sa clé API une fois que l'utilisateur a créé le bac avec cette MAC dans l'app.
+    """
+    result = await db.execute(
+        select(Device).where(Device.mac_address == mac.upper())
+    )
+    device = result.scalar_one_or_none()
+    if device is None:
+        return {"status": "pending"}
+    return {"status": "active", "api_key": device.api_key}

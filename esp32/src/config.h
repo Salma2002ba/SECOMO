@@ -11,11 +11,12 @@
 #define WIFI_RECONNECT_INTERVAL_MS 30000  // 30 secondes entre tentatives
 
 // --- Backend API ---
-#define BACKEND_URL       "http://10.56.224.208:8000"
-#define API_KEY           "a2433a1c45c6f59fe97bbcad862e53acc63eedd4f78b9b1f9e9cf78555708c17"
-#define ENDPOINT_SENSOR   "/api/esp/readings"
-#define ENDPOINT_COMMANDS "/api/commands"
-#define HTTP_TIMEOUT_MS   10000  // 10 secondes
+#define BACKEND_URL            "http://10.56.224.208:8000"
+#define ENDPOINT_SENSOR        "/api/esp/readings"
+#define ENDPOINT_COMMANDS      "/api/esp/commands"
+#define ENDPOINT_PROV_ANNOUNCE "/api/esp/announce"
+#define ENDPOINT_PROV_CLAIM    "/api/esp/claim"
+#define HTTP_TIMEOUT_MS        10000  // 10 secondes
 
 // --- Intervalles ---
 #define SENSOR_READ_INTERVAL_MS  5000    // Lecture capteurs toutes les 5 s (test)

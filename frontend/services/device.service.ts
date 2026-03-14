@@ -43,6 +43,7 @@ export async function createDevice(data: {
   station_id?: string | null;
   bac_row?: number | null;
   bac_col?: number | null;
+  mac_address?: string | null;
 }): Promise<DeviceOut> {
   return apiFetch<DeviceOut>('/api/devices/', {
     method: 'POST',

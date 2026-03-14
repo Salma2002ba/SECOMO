@@ -29,4 +29,7 @@ int networkGetFailureCount();
 // Réinitialise le compteur d'échecs
 void networkResetFailureCount();
 
+// Définit les credentials (MAC + clé API) issus du provisioning
+void networkSetCredentials(const String& mac, const String& apiKey);
+
 #endif // NETWORK_H

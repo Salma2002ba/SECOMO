@@ -23,6 +23,7 @@ class Device(Base):
         UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False
     )
     name: Mapped[str] = mapped_column(String(100), nullable=False)
+    mac_address: Mapped[str | None] = mapped_column(String(17), unique=True, nullable=True, index=True)
     api_key: Mapped[str] = mapped_column(
         String(64), unique=True, nullable=False, default=generate_api_key, index=True
     )

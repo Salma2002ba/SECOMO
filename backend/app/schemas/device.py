@@ -12,6 +12,7 @@ class DeviceCreate(BaseModel):
     station_id: uuid.UUID | None = None
     bac_row: int | None = None
     bac_col: int | None = None
+    mac_address: str | None = None
 
 
 class DeviceUpdate(BaseModel):
@@ -29,6 +30,7 @@ class DeviceOut(BaseModel):
     id: uuid.UUID
     name: str
     api_key: str
+    mac_address: str | None
     size: str
     level: str
     location_label: str | None
