@@ -74,7 +74,7 @@ const Landing: React.FC<LandingProps> = ({ onNavigate }) => {
             <div className="absolute -inset-1 bg-gradient-to-r from-green-500/20 to-green-600/20 rounded-[28px] blur-xl" />
             <div className="relative overflow-hidden rounded-[24px] border border-zinc-700/50 shadow-2xl">
               <img
-                src="/hero-secomo.png"
+                src={`${import.meta.env.BASE_URL}hero-secomo.png`}
                 alt="Serre connectée modulaire SECOMO - système IoT, structure aluminium, capteurs et LED"
                 className="w-full object-cover aspect-[4/3]"
               />
