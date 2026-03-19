@@ -79,7 +79,7 @@ const Auth: React.FC<AuthProps> = ({ type, onBack, onSwitch, onSuccess, lang = '
             )}
 
             {type === 'register' && (
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <label className="text-[10px] font-bold uppercase text-zinc-400 tracking-widest ml-1">{t('auth_firstname', lang)}</label>
                   <input

@@ -50,7 +50,7 @@ const SensorCard: React.FC<SensorCardProps> = ({ label, value, unit, status, tar
   }[status];
 
   return (
-    <div className={`relative p-5 rounded-2xl border transition-all duration-300 flex flex-col justify-between h-40 ${statusStyles[status]}`}>
+    <div className={`relative p-4 md:p-5 rounded-2xl border transition-all duration-300 flex flex-col justify-between min-h-[130px] ${statusStyles[status]}`}>
       <div className="flex justify-between items-start">
         <div className="flex items-center gap-3">
           <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${isDark ? 'bg-white/5 border-white/10' : 'bg-white/60 border-white/40'} border shadow-sm`}>

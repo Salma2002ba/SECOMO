@@ -231,6 +231,7 @@ const App: React.FC = () => {
   const [manualTargetTemp, setManualTargetTemp] = useState(22);
   const [wateringCountdown, setWateringCountdown] = useState<Record<string, number>>({});
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
 
   // --- Computed ---
   const selectedDevice = useMemo(() => 
@@ -1449,12 +1450,17 @@ const App: React.FC = () => {
     <div className={`min-h-screen flex transition-colors duration-500 ${themeClasses}`}>
       <CookieBanner isDark={isDarkMode} lang={lang} />
       {/* Botanical Sidebar */}
-      <aside className={`w-24 lg:w-72 border-r flex flex-col fixed inset-y-0 z-50 transition-colors ${sidebarClasses}`}>
-        <div onClick={() => setView('dashboard')} className="p-8 flex items-center gap-4 cursor-pointer group">
+      {/* Overlay mobile */}
+      {sidebarOpen && (
+        <div className="fixed inset-0 z-40 bg-black/50 lg:hidden" onClick={() => setSidebarOpen(false)} />
+      )}
+
+      <aside className={`w-72 border-r flex flex-col fixed inset-y-0 z-50 transition-all duration-300 ${sidebarClasses} ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'} lg:translate-x-0`}>
+        <div onClick={() => { setView('dashboard'); setSidebarOpen(false); }} className="p-6 lg:p-8 flex items-center gap-4 cursor-pointer group">
           <div className="w-12 h-12 bg-green-600 rounded-2xl flex items-center justify-center text-white shadow-lg shadow-green-200 group-hover:scale-105 transition-transform">
             <i className="fas fa-leaf text-2xl"></i>
           </div>
-          <span className={`text-2xl font-black hidden lg:block tracking-tighter transition-colors ${isDarkMode ? 'text-slate-100' : 'text-slate-800'}`}>SECOMO</span>
+          <span className={`text-2xl font-black tracking-tighter transition-colors ${isDarkMode ? 'text-slate-100' : 'text-slate-800'}`}>SECOMO</span>
         </div>
         
         <nav className="flex-1 px-4 space-y-2 mt-4">
@@ -1468,11 +1474,11 @@ const App: React.FC = () => {
           ].map(item => (
             <button 
               key={item.id}
-              onClick={() => setView(item.id as any)}
+              onClick={() => { setView(item.id as any); setSidebarOpen(false); }}
               className={`w-full flex items-center gap-4 p-4 rounded-2xl transition-all relative ${view === item.id ? 'bg-green-600/10 text-green-500 font-bold' : 'text-slate-400 hover:bg-green-600/5'}`}
             >
               <i className={`fas ${item.icon} w-6 text-center text-xl`}></i>
-              <span className="hidden lg:block">{item.label}</span>
+              <span>{item.label}</span>
               {item.badge ? (
                 <span className="absolute right-4 w-5 h-5 bg-rose-500 text-white text-[10px] rounded-full flex items-center justify-center border-2 border-white">{item.badge}</span>
               ) : null}
@@ -1481,28 +1487,37 @@ const App: React.FC = () => {
         </nav>
 
         <div className={`p-6 border-t ${isDarkMode ? 'border-slate-800' : 'border-slate-100'}`}>
-          <div onClick={() => setView('profil')} className={`flex items-center gap-4 p-4 rounded-2xl cursor-pointer transition-colors ${isDarkMode ? 'hover:bg-slate-800' : 'hover:bg-slate-50'} mb-4`}>
+          <div onClick={() => { setView('profil'); setSidebarOpen(false); }} className={`flex items-center gap-4 p-4 rounded-2xl cursor-pointer transition-colors ${isDarkMode ? 'hover:bg-slate-800' : 'hover:bg-slate-50'} mb-4`}>
             <div className="w-10 h-10 bg-green-100 rounded-full flex items-center justify-center text-green-600 font-bold">
               {currentUser.firstName[0]}{currentUser.lastName[0]}
             </div>
-            <div className="hidden lg:block truncate">
+            <div className="truncate">
               <p className={`text-xs font-black truncate ${isDarkMode ? 'text-slate-100' : 'text-slate-800'}`}>{currentUser.firstName} {currentUser.lastName}</p>
               <p className="text-[10px] text-slate-400 uppercase font-bold tracking-widest">{currentUser.role}</p>
             </div>
           </div>
           <button onClick={handleLogout} className="w-full p-4 text-rose-500 hover:bg-rose-500/10 rounded-2xl transition-colors font-bold flex items-center gap-4">
             <i className="fas fa-power-off w-6 text-center"></i>
-            <span className="hidden lg:block">{t('logout', lang)}</span>
+            <span>{t('logout', lang)}</span>
           </button>
         </div>
       </aside>
 
       {/* Main Panel */}
-      <main className="flex-1 ml-24 lg:ml-72 overflow-y-auto">
-        <header className={`sticky top-0 z-40 backdrop-blur-xl border-b px-8 py-4 flex items-center justify-between gap-6 transition-colors ${headerClasses}`}>
+      <main className="flex-1 lg:ml-72 overflow-y-auto min-w-0">
+        <header className={`sticky top-0 z-40 backdrop-blur-xl border-b px-4 md:px-8 py-3 md:py-4 flex items-center justify-between gap-3 md:gap-6 transition-colors ${headerClasses}`}>
+          {/* Hamburger — mobile only */}
+          <button
+            className="lg:hidden flex-shrink-0 p-2 rounded-xl text-slate-500 hover:text-slate-800 transition-colors"
+            onClick={() => setSidebarOpen(true)}
+            aria-label="Menu"
+          >
+            <i className="fas fa-bars text-xl"></i>
+          </button>
+
           {/* Gauche : titre + station */}
-          <div className="flex-shrink-0">
-            <h2 className={`text-3xl font-black capitalize tracking-tight ${isDarkMode ? 'text-slate-100' : 'text-slate-800'}`}>{
+          <div className="flex-shrink-0 min-w-0">
+            <h2 className={`text-lg md:text-3xl font-black capitalize tracking-tight truncate ${isDarkMode ? 'text-slate-100' : 'text-slate-800'}`}>{
               view === 'profil'     ? t('prof_title', lang)
             : view === 'alerts'    ? t('nav_alerts', lang)
             : view === 'activities'? t('nav_activities', lang)
@@ -1511,14 +1526,14 @@ const App: React.FC = () => {
             : view === 'dashboard' ? t('nav_dashboard', lang)
             : view
             }</h2>
-            <p className="text-slate-400 text-sm font-medium">
+            <p className="hidden md:block text-slate-400 text-sm font-medium">
               {t('header_station', lang)}: <span className="text-green-500">{stations.find(s => s.id === selectedStationId)?.name || '—'}</span>
             </p>
           </div>
 
-          {/* Centre : toggle AUTO/MANUEL + note (dashboard uniquement) */}
+          {/* Centre : toggle AUTO/MANUEL + note (dashboard uniquement, desktop only) */}
           {view === 'dashboard' && selectedDevice && (
-            <div className="flex flex-col items-center gap-1.5 flex-shrink-0">
+            <div className="hidden md:flex flex-col items-center gap-1.5 flex-shrink-0">
               <div
                 onClick={async () => {
                   const newVal = !selectedDevice.automationEnabled;
@@ -1568,7 +1583,7 @@ const App: React.FC = () => {
               <select
                 value={selectedStationId || ''}
                 onChange={(e) => setSelectedStationId(e.target.value)}
-                className={`${inputClasses} border-none rounded-2xl px-6 py-3 text-sm font-bold focus:ring-2 focus:ring-green-500 outline-none cursor-pointer`}
+                className={`${inputClasses} border-none rounded-xl md:rounded-2xl px-2 md:px-6 py-2 md:py-3 text-xs md:text-sm font-bold focus:ring-2 focus:ring-green-500 outline-none cursor-pointer max-w-[120px] md:max-w-none`}
               >
                 {stations.map(station => (
                   <option key={station.id} value={station.id}>
@@ -1585,7 +1600,7 @@ const App: React.FC = () => {
           </div>
         </header>
 
-        <div className="p-8 max-w-7xl mx-auto space-y-8">
+        <div className="p-4 md:p-8 max-w-7xl mx-auto space-y-6 md:space-y-8">
 
           {view === 'dashboard' && !selectedStationId && (
             <div className="flex flex-col items-center justify-center py-32 gap-6 text-center">
@@ -1626,8 +1641,49 @@ const App: React.FC = () => {
           )}
 
           {view === 'dashboard' && selectedDevice && (
-            <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
-              <div className="lg:col-span-3 space-y-8">
+            <>
+            {/* Toggle AUTO/MANUEL — mobile only */}
+            <div className="md:hidden flex items-center justify-center mb-2">
+              <div
+                onClick={async () => {
+                  const newVal = !selectedDevice.automationEnabled;
+                  setDevices(prev => prev.map(d => d.id === selectedDevice.id ? {
+                    ...d,
+                    automationEnabled: newVal,
+                    ...(newVal ? { isFanOn: false, isLightOn: false } : {}),
+                  } : d));
+                  if (backendOnline) {
+                    try { await deviceService.updateDevice(selectedDevice.id, { automation_enabled: newVal }); } catch { /* silently fail */ }
+                  }
+                }}
+                className={`relative cursor-pointer rounded-2xl p-0.5 transition-all duration-300 shadow-md select-none w-44 ${
+                  selectedDevice.automationEnabled
+                    ? 'bg-green-500 shadow-green-500/30'
+                    : (isDarkMode ? 'bg-slate-700' : 'bg-slate-200')
+                }`}
+              >
+                <div className={`absolute top-0.5 bottom-0.5 w-[calc(50%-3px)] rounded-xl bg-white shadow-sm transition-all duration-300 ${
+                  selectedDevice.automationEnabled ? 'left-[calc(50%+2px)]' : 'left-0.5'
+                }`}></div>
+                <div className="relative grid grid-cols-2 text-center">
+                  <div className={`py-2 px-3 flex items-center justify-center gap-1.5 transition-colors duration-300 ${
+                    !selectedDevice.automationEnabled ? 'text-slate-700 font-black' : 'text-white/60 font-bold'
+                  }`}>
+                    <i className="fas fa-hand-pointer text-xs"></i>
+                    <span className="text-xs uppercase tracking-wide">{t('dash_manual_mode', lang)}</span>
+                  </div>
+                  <div className={`py-2 px-3 flex items-center justify-center gap-1.5 transition-colors duration-300 ${
+                    selectedDevice.automationEnabled ? 'text-green-700 font-black' : 'text-white/50 font-bold'
+                  }`}>
+                    <i className="fas fa-robot text-xs"></i>
+                    <span className="text-xs uppercase tracking-wide">{t('dash_auto_mode', lang)}</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 lg:grid-cols-4 gap-6 md:gap-8">
+              <div className="lg:col-span-3 space-y-6 md:space-y-8">
                 {/* Sélecteur de bac dans la station */}
                 {(() => {
                   const stationBacs = devices.filter(d => d.stationId === selectedStationId);
@@ -1693,12 +1749,12 @@ const App: React.FC = () => {
                 {/* Contrôles Manuels — ligne horizontale sous l'historique, visible seulement en mode MANUEL */}
                 {!selectedDevice.automationEnabled && (
                   <div className={`${cardClasses} rounded-[32px] border shadow-sm overflow-hidden`}>
-                    <div className="px-8 py-5 border-b flex items-center gap-2 ${isDarkMode ? 'border-slate-800' : 'border-slate-100'}">
+                    <div className="px-4 md:px-8 py-4 md:py-5 border-b flex items-center gap-2 ${isDarkMode ? 'border-slate-800' : 'border-slate-100'}">
                       <i className="fas fa-hand-pointer text-slate-400"></i>
                       <h3 className={`text-base font-black ${isDarkMode ? 'text-slate-100' : 'text-slate-800'}`}>{t('dash_manual_controls', lang)}</h3>
                     </div>
-                    <div className="px-8 py-6">
-                      <div className="grid grid-cols-3 gap-6">
+                    <div className="px-4 md:px-8 py-4 md:py-6">
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 md:gap-6">
 
                         {/* 1. Arroser */}
                         <div className="space-y-3">
@@ -1799,9 +1855,9 @@ const App: React.FC = () => {
               </div>
 
               {/* Colonne droite */}
-              <div className="space-y-8">
+              <div className="space-y-6 md:space-y-8">
                 <WeatherWidget isDark={isDarkMode} lang={lang} />
-                <div className={`${cardClasses} p-8 rounded-[32px] border shadow-sm`}>
+                <div className={`${cardClasses} p-5 md:p-8 rounded-[24px] md:rounded-[32px] border shadow-sm`}>
                   <h3 className={`text-lg font-black mb-6 ${isDarkMode ? 'text-slate-100' : 'text-slate-800'}`}>{t('dash_cultivated_plant', lang)}</h3>
                   {currentPlant ? (
                     <div className="flex items-center gap-4 mb-6">
@@ -1873,13 +1929,14 @@ const App: React.FC = () => {
                 )}
               </div>
             </div>
+            </>
           )}
 
           {view === 'profil' && (
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 pb-20">
               {/* Left Column: Info & Security */}
               <div className="lg:col-span-2 space-y-8">
-                <section className={`${cardClasses} p-10 rounded-[40px] border shadow-sm space-y-8`}>
+                <section className={`${cardClasses} p-5 md:p-10 rounded-[24px] md:rounded-[40px] border shadow-sm space-y-6 md:space-y-8`}>
                   <div className="flex items-center gap-4">
                      <div className="w-16 h-16 bg-green-600 rounded-[20px] flex items-center justify-center text-white text-3xl font-black shadow-xl shadow-green-600/20">
                        {currentUser.firstName[0]}
@@ -1929,7 +1986,7 @@ const App: React.FC = () => {
                   </div>
                 </section>
 
-                <section className={`${cardClasses} p-10 rounded-[40px] border shadow-sm space-y-8`}>
+                <section className={`${cardClasses} p-5 md:p-10 rounded-[24px] md:rounded-[40px] border shadow-sm space-y-6 md:space-y-8`}>
                   <h3 className={`text-2xl font-black ${isDarkMode ? 'text-slate-100' : 'text-slate-800'}`}>{t('prof_security_title', lang)}</h3>
                   <form onSubmit={handleChangePassword} className="space-y-6">
                     <div className="space-y-2">
@@ -1978,7 +2035,7 @@ const App: React.FC = () => {
 
               {/* Right Column: Preferences */}
               <div className="space-y-8">
-                <section className={`${cardClasses} p-10 rounded-[40px] border shadow-sm space-y-8`}>
+                <section className={`${cardClasses} p-5 md:p-10 rounded-[24px] md:rounded-[40px] border shadow-sm space-y-6 md:space-y-8`}>
                   <h3 className={`text-xl font-black ${isDarkMode ? 'text-slate-100' : 'text-slate-800'}`}>{t('prof_appearance', lang)}</h3>
                   <div className="space-y-4">
                     <button 
@@ -2004,7 +2061,7 @@ const App: React.FC = () => {
                   </div>
                 </section>
 
-                <section className={`${cardClasses} p-10 rounded-[40px] border shadow-sm space-y-8`}>
+                <section className={`${cardClasses} p-5 md:p-10 rounded-[24px] md:rounded-[40px] border shadow-sm space-y-6 md:space-y-8`}>
                   <h3 className={`text-xl font-black ${isDarkMode ? 'text-slate-100' : 'text-slate-800'}`}>{t('prof_general_settings', lang)}</h3>
                   
                   <div className="space-y-4">

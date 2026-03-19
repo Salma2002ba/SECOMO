@@ -65,7 +65,7 @@ const WaterTankCard: React.FC<WaterTankCardProps> = ({ level, capacityLiters, is
   ].join(' ');
 
   return (
-    <div className={`relative p-5 rounded-2xl border h-40 flex flex-col justify-between overflow-hidden ${cardBg} ${border}`}>
+    <div className={`relative p-4 md:p-5 rounded-2xl border min-h-[130px] flex flex-col justify-between overflow-hidden ${cardBg} ${border}`}>
 
       {/*
         Single SVG covering the entire card.

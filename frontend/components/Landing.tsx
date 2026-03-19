@@ -43,7 +43,7 @@ const Landing: React.FC<LandingProps> = ({ onNavigate }) => {
               <span className="w-2 h-2 bg-green-400 rounded-full animate-pulse" />
               Projet SECOMO Innov 2026
             </div>
-            <h1 className="text-5xl lg:text-6xl xl:text-7xl font-black text-white leading-[1.05] tracking-tight">
+            <h1 className="text-4xl sm:text-5xl lg:text-6xl xl:text-7xl font-black text-white leading-[1.05] tracking-tight">
               La serre connectée{' '}
               <span className="bg-gradient-to-r from-green-300 to-green-500 bg-clip-text text-transparent">
                 modulaire.
@@ -136,7 +136,7 @@ const Landing: React.FC<LandingProps> = ({ onNavigate }) => {
       {/* How it works */}
       <section id="how-it-works" className="py-24 px-6">
         <div className="max-w-7xl mx-auto">
-          <div className="relative rounded-3xl bg-gradient-to-br from-zinc-800 to-zinc-900 border border-zinc-700/50 p-12 lg:p-16 overflow-hidden">
+          <div className="relative rounded-3xl bg-gradient-to-br from-zinc-800 to-zinc-900 border border-zinc-700/50 p-6 sm:p-12 lg:p-16 overflow-hidden">
             <div className="absolute top-0 right-0 w-96 h-96 bg-green-500/10 rounded-full blur-3xl pointer-events-none" />
             <div className="absolute bottom-0 left-0 w-64 h-64 bg-green-600/10 rounded-full blur-3xl pointer-events-none" />
             <div className="relative z-10 grid grid-cols-1 lg:grid-cols-2 gap-16 items-center">
