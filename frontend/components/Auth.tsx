@@ -17,6 +17,7 @@ const Auth: React.FC<AuthProps> = ({ type, onBack, onSwitch, onSuccess, lang = '
   const [lastName, setLastName] = React.useState('');
   const [error, setError] = React.useState('');
   const [loading, setLoading] = React.useState(false);
+  React.useEffect(() => { setError(''); setLoading(false); }, [type]);
   const [showConditions, setShowConditions] = React.useState(false);
 
   return (

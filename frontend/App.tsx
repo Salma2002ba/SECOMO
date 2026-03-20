@@ -894,7 +894,12 @@ const App: React.FC = () => {
       setBackendOnline(true);
       setPage('app');
     } catch (err: any) {
-      // Fallback simulation si backend down
+      // Si le backend est joignable mais les identifiants sont mauvais → erreur visible, pas de fallback
+      const isNetworkError = !err.message || err.message === 'Failed to fetch' || err.message.includes('NetworkError') || err.message.includes('net::');
+      if (!isNetworkError) {
+        throw err;
+      }
+      // Fallback simulation uniquement si backend inaccessible
       console.log('[SECOMO] Auth fallback mode simulation:', err.message);
       setCurrentUser({ ...MOCK_USER, email });
       setBackendOnline(false);
@@ -1723,7 +1728,7 @@ const App: React.FC = () => {
                     <SensorCard label={t('dash_temp', lang)} value={formatTemp(currentReading.tempAir)} unit={currentUser.unit === 'celsius' ? '°C' : '°F'} status={currentPlant ? getSensorStatus(currentReading.tempAir, currentPlant.tempMin, currentPlant.tempMax) : 'neutral'} targetRange={currentPlant ? `${formatTemp(currentPlant.tempMin).toFixed(0)}-${formatTemp(currentPlant.tempMax).toFixed(0)}°` : '—'} icon="fa-thermometer-half" isDark={isDarkMode} lang={lang} showTempToggle tempUnit={currentUser.unit} onToggleTempUnit={u => updateProfile({ unit: u })} />
                     <SensorCard label={t('dash_humidity', lang)} value={currentReading.humidity} unit="%" status={currentPlant ? getSensorStatus(currentReading.humidity, currentPlant.humidityMin, currentPlant.humidityMax) : 'neutral'} targetRange={currentPlant ? `${currentPlant.humidityMin}-${currentPlant.humidityMax}%` : '—'} icon="fa-tint" isDark={isDarkMode} lang={lang} />
                     {(() => {
-                      const lightPct = Math.round(currentReading.light / stationLightMax * 100);
+                      const lightPct = currentReading.light / stationLightMax * 100;
                       const lightStatus = !currentPlant || isNight ? 'neutral'
                         : currentReading.light < currentPlant.lightMin ? 'low'
                         : (currentPlant.lightMax > 0 && currentReading.light > currentPlant.lightMax) ? 'high'
@@ -1734,7 +1739,7 @@ const App: React.FC = () => {
                       return <SensorCard label={t('dash_light', lang)} value={lightPct} unit="%" status={lightStatus} targetRange={lightTarget} icon="fa-sun" isDark={isDarkMode} lang={lang} />;
                     })()}
                     <SensorCard label={t('dash_ph', lang)} value={currentReading.soilPh} unit="pH" status={currentPlant ? getSensorStatus(currentReading.soilPh, currentPlant.phMin, currentPlant.phMax) : 'neutral'} targetRange={currentPlant ? `${currentPlant.phMin}-${currentPlant.phMax}` : '—'} icon="fa-flask" isDark={isDarkMode} lang={lang} />
-                    <SensorCard label={t('dash_battery', lang)} value={Math.round(currentReading.batteryLevel)} unit="%" status={currentReading.batteryLevel < 20 ? 'low' : 'ok'} targetRange="Min 20%" icon="fa-battery-half" isDark={isDarkMode} lang={lang} />
+                    <SensorCard label={t('dash_battery', lang)} value={currentReading.batteryLevel <= 0 ? 100 : Math.round(currentReading.batteryLevel)} unit="%" status={currentReading.batteryLevel > 0 && currentReading.batteryLevel < 20 ? 'low' : 'ok'} targetRange="Min 20%" icon="fa-battery-half" isDark={isDarkMode} lang={lang} />
                     <WaterTankCard level={currentReading.waterTankLevel} capacityLiters={selectedDevice.config.tankCapacityLiters} isDark={isDarkMode} lang={lang} />
                   </div>
                 ) : (
@@ -1882,27 +1887,6 @@ const App: React.FC = () => {
                   </button>
                 </div>
 
-                {/* Recommandations */}
-                {recommendations.length > 0 && (
-                  <div className={`${cardClasses} p-6 rounded-[32px] border shadow-sm space-y-3`}>
-                    <h3 className={`text-base font-black ${isDarkMode ? 'text-slate-100' : 'text-slate-800'}`}>{t('rec_title', lang)}</h3>
-                    {recommendations.map(rec => (
-                      <div key={rec.id} className={`p-4 rounded-2xl flex items-start gap-3 ${
-                        rec.severity === 'critical' ? (isDarkMode ? 'bg-rose-500/10' : 'bg-rose-50')
-                        : rec.severity === 'warning' ? (isDarkMode ? 'bg-amber-500/10' : 'bg-amber-50')
-                        : (isDarkMode ? 'bg-blue-500/10' : 'bg-blue-50')
-                      }`}>
-                        <i className={`fas ${
-                          rec.severity === 'critical' ? 'fa-circle-exclamation text-rose-500'
-                          : rec.severity === 'warning' ? 'fa-triangle-exclamation text-amber-500'
-                          : 'fa-circle-info text-blue-400'
-                        } mt-0.5 flex-shrink-0`}></i>
-                        <p className={`text-sm font-medium ${isDarkMode ? 'text-slate-200' : 'text-slate-700'}`}>{rec.text}</p>
-                      </div>
-                    ))}
-                  </div>
-                )}
-
                 {/* Mode AUTO actif : statut ventilateur + bouton switch manuel */}
                 {selectedDevice.automationEnabled && (
                   <div className="space-y-2">
@@ -1925,6 +1909,27 @@ const App: React.FC = () => {
                       <i className="fas fa-lock text-green-500 text-xs"></i>
                       <span className="text-xs font-bold text-green-600">{t('dash_auto_active', lang)}</span>
                     </button>
+                  </div>
+                )}
+
+                {/* Recommandations */}
+                {recommendations.length > 0 && (
+                  <div className={`${cardClasses} p-6 rounded-[32px] border shadow-sm space-y-3`}>
+                    <h3 className={`text-base font-black ${isDarkMode ? 'text-slate-100' : 'text-slate-800'}`}>{t('rec_title', lang)}</h3>
+                    {recommendations.map(rec => (
+                      <div key={rec.id} className={`p-4 rounded-2xl flex items-start gap-3 ${
+                        rec.severity === 'critical' ? (isDarkMode ? 'bg-rose-500/10' : 'bg-rose-50')
+                        : rec.severity === 'warning' ? (isDarkMode ? 'bg-amber-500/10' : 'bg-amber-50')
+                        : (isDarkMode ? 'bg-blue-500/10' : 'bg-blue-50')
+                      }`}>
+                        <i className={`fas ${
+                          rec.severity === 'critical' ? 'fa-circle-exclamation text-rose-500'
+                          : rec.severity === 'warning' ? 'fa-triangle-exclamation text-amber-500'
+                          : 'fa-circle-info text-blue-400'
+                        } mt-0.5 flex-shrink-0`}></i>
+                        <p className={`text-sm font-medium ${isDarkMode ? 'text-slate-200' : 'text-slate-700'}`}>{rec.text}</p>
+                      </div>
+                    ))}
                   </div>
                 )}
               </div>

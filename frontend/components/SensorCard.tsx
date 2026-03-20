@@ -21,6 +21,9 @@ interface SensorCardProps {
 const SensorCard: React.FC<SensorCardProps> = ({ label, value, unit, status, targetRange, icon, hidden, isDark, lang = 'FR' as Lang, showTempToggle, tempUnit, onToggleTempUnit }) => {
   if (hidden) return null;
 
+  const unavailable = value < 0;
+  const effectiveStatus: SensorStatus = unavailable ? 'neutral' : status;
+
   const statusStyles = {
     ok: isDark ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400' : 'bg-emerald-50 border-emerald-100 text-emerald-700',
     low: isDark ? 'bg-amber-500/10 border-amber-500/20 text-amber-400' : 'bg-amber-50 border-amber-100 text-amber-700',
@@ -50,7 +53,7 @@ const SensorCard: React.FC<SensorCardProps> = ({ label, value, unit, status, tar
   }[status];
 
   return (
-    <div className={`relative p-4 md:p-5 rounded-2xl border transition-all duration-300 flex flex-col justify-between min-h-[130px] ${statusStyles[status]}`}>
+    <div className={`relative p-4 md:p-5 rounded-2xl border transition-all duration-300 flex flex-col justify-between min-h-[130px] ${statusStyles[effectiveStatus]}`}>
       <div className="flex justify-between items-start">
         <div className="flex items-center gap-3">
           <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${isDark ? 'bg-white/5 border-white/10' : 'bg-white/60 border-white/40'} border shadow-sm`}>
@@ -59,14 +62,17 @@ const SensorCard: React.FC<SensorCardProps> = ({ label, value, unit, status, tar
           <span className="font-semibold text-sm uppercase tracking-wide opacity-80">{label}</span>
         </div>
         <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${isDark ? 'bg-white/10 border-white/5' : 'bg-white/50 border-white/20'}`}>
-          {statusLabels[status]}
+          {statusLabels[effectiveStatus]}
         </span>
       </div>
 
       <div className="mt-4">
         <div className="flex items-baseline gap-1">
-          <span className="text-3xl font-bold tracking-tight">{value.toFixed(1)}</span>
-          <span className="text-sm font-medium opacity-60 uppercase">{unit}</span>
+          {unavailable
+            ? <span className="text-3xl font-bold tracking-tight opacity-40">N/C</span>
+            : <><span className="text-3xl font-bold tracking-tight">{value.toFixed(1)}</span>
+               <span className="text-sm font-medium opacity-60 uppercase">{unit}</span></>
+          }
         </div>
         {targetRange && (
           <p className="text-[10px] mt-2 font-medium opacity-50 flex items-center gap-1">
