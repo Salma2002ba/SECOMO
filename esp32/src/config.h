@@ -11,7 +11,7 @@
 #define WIFI_RECONNECT_INTERVAL_MS 30000  // 30 secondes entre tentatives
 
 // --- Backend API ---
-#define BACKEND_URL            "http://10.56.224.208:8000"
+#define BACKEND_URL            "http://10.48.205.208:8000"
 #define ENDPOINT_SENSOR        "/api/esp/readings"
 #define ENDPOINT_COMMANDS      "/api/esp/commands"
 #define ENDPOINT_PROV_ANNOUNCE "/api/esp/announce"
