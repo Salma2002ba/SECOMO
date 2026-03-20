@@ -1139,7 +1139,7 @@ const App: React.FC = () => {
     if (catalogSearch.length < 2) { setCatalogResults([]); return; }
     setCatalogLoading(true);
     const timer = setTimeout(() => {
-      fetch(`http://localhost:8000/api/catalog/plants?q=${encodeURIComponent(catalogSearch)}&lang=${userLang}&limit=8`)
+      fetch(`${import.meta.env.VITE_API_BASE || 'http://localhost:8000'}/api/catalog/plants?q=${encodeURIComponent(catalogSearch)}&lang=${userLang}&limit=8`)
         .then(r => r.json())
         .then(data => { setCatalogResults(data); setCatalogLoading(false); })
         .catch(() => setCatalogLoading(false));

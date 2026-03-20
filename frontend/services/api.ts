@@ -1,4 +1,6 @@
-const API_BASE = 'http://localhost:8000';
+// Dépend de l'environnement (prod sur GitHub Pages -> backend hébergé en ligne)
+// En dev, si la variable n'est pas fournie, on retombe sur localhost.
+const API_BASE = import.meta.env.VITE_API_BASE || 'http://localhost:8000';
 
 let accessToken: string | null = localStorage.getItem('secomo_access_token');
 let refreshToken: string | null = localStorage.getItem('secomo_refresh_token');

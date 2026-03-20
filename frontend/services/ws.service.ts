@@ -1,7 +1,8 @@
 type EventType = 'sensor_reading' | 'alert' | 'watering_status' | 'device_status';
 type Listener = (data: any, deviceId: string) => void;
 
-const WS_BASE = 'ws://localhost:8000';
+// Dépend de l'environnement (prod sur HTTPS -> wss://...)
+const WS_BASE = import.meta.env.VITE_WS_BASE || 'ws://localhost:8000';
 const RECONNECT_DELAY = 3000;
 const PING_INTERVAL = 30000;
 

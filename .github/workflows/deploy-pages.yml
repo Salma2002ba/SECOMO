@@ -38,6 +38,9 @@ jobs:
         run: cd frontend && npm ci
 
       - name: Build
+        env:
+          VITE_API_BASE: ${{ secrets.VITE_API_BASE }}
+          VITE_WS_BASE: ${{ secrets.VITE_WS_BASE }}
         run: cd frontend && npm run build
 
       - name: Upload artifact
