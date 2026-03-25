@@ -37,10 +37,12 @@ jobs:
       - name: Install dependencies
         run: cd frontend && npm ci
 
+      # Utilise les Repository variables (Settings → Secrets and variables → Actions → Variables)
+      # pour que VITE_API_BASE / VITE_WS_BASE soient injectés au build Vite.
       - name: Build
         env:
-          VITE_API_BASE: ${{ secrets.VITE_API_BASE }}
-          VITE_WS_BASE: ${{ secrets.VITE_WS_BASE }}
+          VITE_API_BASE: ${{ vars.VITE_API_BASE }}
+          VITE_WS_BASE: ${{ vars.VITE_WS_BASE }}
         run: cd frontend && npm run build
 
       - name: Upload artifact
