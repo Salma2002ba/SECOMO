@@ -61,8 +61,13 @@ jobs:
           rm -rf assets
           cp -f frontend/dist/index.html ./index.html
           cp -r frontend/dist/assets ./assets
-          # Optional: favicon/robots if present in dist
-          cp -f frontend/dist/favicon* ./ 2>/dev/null || true
+          # Fichiers public/ (Vite les met à la racine de dist) : images, favicon, etc.
+          shopt -s nullglob
+          for f in frontend/dist/*; do
+            if [[ -f "$f" ]]; then
+              cp -f "$f" ./
+            fi
+          done
 
       - name: Commit root files (only if changed)
         if: github.actor != 'github-actions[bot]'
@@ -74,7 +79,11 @@ jobs:
           fi
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add index.html assets || true
+          git add index.html assets
+          shopt -s nullglob
+          for f in *.png *.jpg *.jpeg *.svg *.ico *.webp; do
+            [[ -f "$f" ]] && git add "$f" || true
+          done
           git commit -m "chore: deploy built frontend to Pages root" || true
           git push origin HEAD:arthur
 
